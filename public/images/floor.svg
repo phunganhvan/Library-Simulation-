@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300" viewBox="0 0 600 300">
+  <defs>
+    <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+      <rect width="30" height="30" fill="#e3f2fd"/>
+      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#bbdefb" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="light" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8f5e9" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#e3f2fd" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="300" fill="url(#grid)"/>
+  <rect width="600" height="300" fill="url(#light)"/>
+  <text x="300" y="32" text-anchor="middle" font-size="18" font-family="Segoe UI, sans-serif" fill="#1e88e5">
+    KHU VỰC QUẦY MƯỢN - THƯ VIỆN TẠ QUANG BỬU
+  </text>
+</svg>

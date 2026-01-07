@@ -1,0 +1,12 @@
+{
+    "name": "library-counter-simulation",
+    "version": "1.0.0",
+    "description": "Mô phỏng quầy mượn sách Thư viện Tạ Quang Bửu - ĐHBK Hà Nội",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "dependencies": {
+        "express": "^4.21.0"
+    }
+}

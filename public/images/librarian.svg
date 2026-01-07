@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="bgL" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ede7f6"/>
+      <stop offset="1" stop-color="#d1c4e9"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="18" fill="url(#bgL)"/>
+  <circle cx="60" cy="34" r="18" fill="#ffe0b2" stroke="#8d6e63" stroke-width="3"/>
+  <rect x="38" y="56" width="44" height="34" rx="10" fill="#5e35b1"/>
+  <polygon points="60,60 52,78 68,78" fill="#d1c4e9"/>
+  <rect x="18" y="82" width="84" height="16" rx="4" fill="#fff3e0" stroke="#ffb74d" stroke-width="2"/>
+  <text x="60" y="94" text-anchor="middle" font-size="10" font-family="Segoe UI, sans-serif" fill="#6d4c41">
+    THỦ THƯ
+  </text>
+</svg>
