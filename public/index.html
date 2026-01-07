@@ -16,6 +16,7 @@
 
         <main class="main">
             <section class="controls">
+                <div id="view-setup" class="view active">
                 <div class="control-group">
                     <label>
                         Số quầy (server):
@@ -88,14 +89,6 @@
 
                 <div id="input-errors" class="input-errors" aria-live="polite"></div>
 
-                <div class="control-buttons">
-                    <button id="btn-start" data-tooltip="Bắt đầu chạy mô phỏng theo tham số hiện tại">Bắt đầu mô
-                        phỏng</button>
-                    <button id="btn-stop" data-tooltip="Dừng mô phỏng và giữ nguyên kết quả hiện tại">Dừng</button>
-                    <button id="btn-reset"
-                        data-tooltip="Reset mô phỏng (xóa hàng chờ, số liệu, thời gian)">Reset</button>
-                </div>
-
                 <details class="param-help">
                     <summary>Giải thích tham số (nhấn để mở)</summary>
                     <div class="param-help-body">
@@ -116,7 +109,18 @@
                         </ul>
                     </div>
                 </details>
+                </div>
 
+                <div class="control-buttons sim-controls">
+                    <button id="btn-start" data-tooltip="Bắt đầu chạy mô phỏng theo tham số hiện tại">Bắt đầu mô
+                        phỏng</button>
+                    <button id="btn-stop" data-tooltip="Dừng mô phỏng và giữ nguyên kết quả hiện tại">Dừng</button>
+                    <button id="btn-reset"
+                        data-tooltip="Reset mô phỏng (xóa hàng chờ, số liệu, thời gian)">Reset</button>
+                </div>
+            </section>
+
+            <div id="view-sim" class="view">
                 <div class="stats-tools">
                     <div class="control-buttons">
                         <button id="btn-preset-balanced" type="button"
@@ -185,7 +189,6 @@
 
                     <p class="hint">Phím tắt: Space = Tạm dừng • L = Đổi policy • T = Bật/Tắt ưu tiên • R = Reset</p>
                 </div>
-            </section>
 
             <section class="stats">
                 <div>Tổng sinh viên đã đến: <span id="stat-total">0</span></div>
@@ -283,6 +286,7 @@
                     </div>
                 </div>
             </section>
+            </div>
         </main>
 
         <footer class="footer">

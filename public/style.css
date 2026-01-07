@@ -39,10 +39,22 @@ body {
     gap: 14px;
 }
 
+.view {
+    display: none;
+}
+
+.view.active {
+    display: block;
+}
+
 .controls {
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+.sim-controls {
+    margin-top: 6px;
 }
 
 .control-divider {

@@ -71,6 +71,8 @@
             this._initialized = false;
 
             this.errorModal = document.getElementById("error-modal");
+            this.viewSetup = document.getElementById("view-setup");
+            this.viewSim = document.getElementById("view-sim");
             this.btnErrorClose = document.getElementById("btn-error-close");
             this.errorSummary = document.getElementById("error-summary");
             this.errorAdvice = document.getElementById("error-advice");
@@ -83,6 +85,15 @@
             window.addEventListener("keydown", (e) => this._handleKeydown(e));
 
             this.reset();
+        }
+
+        _showView(name) {
+            const setup = this.viewSetup;
+            const sim = this.viewSim;
+            if (!setup || !sim) return;
+            const showSim = name === "sim";
+            setup.classList.toggle("active", !showSim);
+            sim.classList.toggle("active", showSim);
         }
 
         _handleKeydown(e) {
@@ -139,6 +150,8 @@
             this.dashboard.reset();
             this._render({});
 
+            this._showView("sim");
+
             this.timerId = setInterval(() => {
                 if (this.paused) return;
                 const events = this.engine.step();
@@ -161,6 +174,8 @@
             clearInterval(this.timerId);
             this.timerId = null;
             this.paused = false;
+
+            this._showView("setup");
 
             if (this._initialized) this.epoch += 1;
             else {
