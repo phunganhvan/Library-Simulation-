@@ -163,7 +163,7 @@
             this.renegedEvents = [];
             this.waitEvents = [];
 
-            this.nextCustomerId = 1;
+            this.nextStudentId = 1;
 
             this.recentServed = [];
 
@@ -287,7 +287,7 @@
                 s.completed = 0;
             }
 
-            // reset baseline waiting time for customers already in queue
+            // reset baseline waiting time for students already in queue
             const bump = (c) => {
                 if (!c) return;
                 if (c.arrivalTime < this.measureStartTime) c.arrivalTime = this.measureStartTime;
@@ -328,7 +328,7 @@
             return this.singleQueue.length;
         }
 
-        _enqueue(customer) {
+        _enqueue(student) {
             // Capacity constraint (balking): limit total waiting queue
             const cap = this.config.maxQueue;
             if (cap > 0 && this._effectiveQueueLength() >= cap) {
@@ -342,24 +342,24 @@
                 for (const s of this.servers) {
                     if (s.queue.length < best.queue.length) best = s;
                 }
-                this._enqueueIntoQueue(best.queue, customer);
+                this._enqueueIntoQueue(best.queue, student);
             } else {
-                this._enqueueIntoQueue(this.singleQueue, customer);
+                this._enqueueIntoQueue(this.singleQueue, student);
             }
 
             return true;
         }
 
-        _enqueueIntoQueue(queue, customer) {
+        _enqueueIntoQueue(queue, student) {
             if (!this.config.priorityEnabled) {
-                queue.push(customer);
+                queue.push(student);
                 return;
             }
 
             // Smaller number => higher priority (0 is higher than 1)
-            const idx = queue.findIndex((c) => c.priority > customer.priority);
-            if (idx === -1) queue.push(customer);
-            else queue.splice(idx, 0, customer);
+            const idx = queue.findIndex((c) => c.priority > student.priority);
+            if (idx === -1) queue.push(student);
+            else queue.splice(idx, 0, student);
         }
 
         _dequeueForServer(server) {
@@ -387,11 +387,13 @@
 
             // Arrival process
             const arrivals = [];
+            const balked = [];
+            const reneged = [];
 
-            const makeCustomer = (arrivalTime) => {
+            const makeStudent = (arrivalTime) => {
                 const isPriority = this.config.priorityEnabled && this.rng() < this.config.priorityProbability;
                 return {
-                    id: this.nextCustomerId++,
+                    id: this.nextStudentId++,
                     arrivalTime,
                     priority: isPriority ? 0 : 1,
                 };
@@ -401,27 +403,29 @@
                 // allow multiple arrivals within one tick
                 while (this.nextArrivalTime !== null && this.nextArrivalTime <= this.simTime) {
                     const tArrival = this.nextArrivalTime;
-                    const customer = makeCustomer(tArrival);
-                    const enq = this._enqueue(customer);
+                    const student = makeStudent(tArrival);
+                    const enq = this._enqueue(student);
                     if (enq && tArrival >= this.measureStartTime) this.totalArrived += 1;
-                    if (enq) arrivals.push(customer);
+                    if (enq) arrivals.push(student);
+                    if (!enq) balked.push(student);
                     if (enq && tArrival >= this.measureStartTime) this._pushCapped(this.arrivalEvents, tArrival, 8000);
                     this.nextArrivalTime += expSample(meanInterArrivalSeconds, this.rng);
                 }
             } else {
                 // Bernoulli per tick (simple)
-                const lambda = 1 / meanInterArrivalSeconds; // customers/second
+                const lambda = 1 / meanInterArrivalSeconds; // students/second
                 const probArrival = Math.min(0.95, lambda * this.TICK_SECONDS);
                 if (this.rng() < probArrival) {
-                    const customer = makeCustomer(this.simTime);
-                    const enq = this._enqueue(customer);
+                    const student = makeStudent(this.simTime);
+                    const enq = this._enqueue(student);
                     if (enq && this.simTime >= this.measureStartTime) this.totalArrived += 1;
-                    if (enq) arrivals.push(customer);
+                    if (enq) arrivals.push(student);
+                    if (!enq) balked.push(student);
                     if (enq && this.simTime >= this.measureStartTime) this._pushCapped(this.arrivalEvents, this.simTime, 8000);
                 }
             }
 
-            // Reneging (patience): remove customers that waited too long
+            // Reneging (patience): remove students that waited too long
             if (patienceSeconds > 0) {
                 const now = this.simTime;
                 const shouldLeave = (c) => now - c.arrivalTime >= patienceSeconds;
@@ -433,6 +437,7 @@
                         if (shouldLeave(c)) {
                             if (now >= this.measureStartTime) this.totalReneged += 1;
                             if (now >= this.measureStartTime) this._pushCapped(this.renegedEvents, now, 8000);
+                            reneged.push(c);
                         } else {
                             kept.push(c);
                         }
@@ -461,7 +466,7 @@
                     server.totalBusyTime += measuredDt;
 
                     if (server.remainingService <= 0) {
-                        justFinished.push({ serverId: server.id, customer: server.current });
+                        justFinished.push({ serverId: server.id, student: server.current });
                         this.recentServed.push({ id: server.current.id, finishedAt: this.simTime });
 
                         server.current = null;
@@ -485,7 +490,7 @@
 
                         server.current = next;
                         server.remainingService = randomServiceTime(meanServiceSeconds, serviceDistribution, this.rng);
-                        justAssigned.push({ serverId: server.id, customer: next });
+                        justAssigned.push({ serverId: server.id, student: next });
                     }
                 }
             }
@@ -502,6 +507,8 @@
                 arrivals,
                 justAssigned,
                 justFinished,
+                balked,
+                reneged,
             };
         }
 
@@ -616,10 +623,10 @@
                 ⇒ <code>ρ ≈ ${m.utilAvg.toFixed(1)}%</code>.</p>
 
                 <p><strong>4. Ưu tiên &amp; ràng buộc hàng chờ</strong><br>
-                Nếu bật <code>priority</code>, khách ưu tiên sẽ đứng trước khách thường, và trong cùng nhóm vẫn theo FIFO (không giành quyền).<br>
-                Nếu đặt <code>maxQueue &gt; 0</code>, khi hàng chờ đã đạt giới hạn thì khách mới đến sẽ không vào hệ thống (balking).<br>
-                Nếu đặt <code>patienceSeconds &gt; 0</code>, khách chờ quá ngưỡng sẽ rời khỏi hàng (reneging).<br>
-                Quan sát: <code>balking = ${m.balked}</code>, <code>reneging = ${m.reneged}</code>.</p>
+                Nếu bật ưu tiên, sinh viên ưu tiên sẽ đứng trước sinh viên thường, và trong cùng nhóm vẫn theo FIFO (không giành quyền).<br>
+                Nếu đặt <code>maxQueue &gt; 0</code>, khi hàng chờ đã đạt giới hạn thì sinh viên mới đến sẽ không vào hệ thống.<br>
+                Nếu đặt <code>patienceSeconds &gt; 0</code>, sinh viên chờ quá ngưỡng sẽ rời khỏi hàng.<br>
+                Quan sát: <code>không vào hệ = ${m.balked}</code>, <code>bỏ hàng = ${m.reneged}</code>.</p>
 
                 <p><strong>5. Phân phối &amp; độ biến động</strong><br>
                 Dòng đến: <code>${this.config.arrivalDistribution}</code>, phục vụ: <code>${this.config.serviceDistribution}</code>.<br>

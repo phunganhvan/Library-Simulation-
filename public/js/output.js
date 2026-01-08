@@ -8,9 +8,32 @@
      */
     class OutputRenderer {
         constructor() {
+            this.floor = document.querySelector(".floor");
             this.queueArea = document.getElementById("queue-area");
             this.countersContainer = document.getElementById("counters-container");
             this.servedArea = document.getElementById("served-area");
+
+            this.studentsLayer = document.getElementById("students-layer");
+            this.doorIn = document.getElementById("door-in");
+            this.doorOut = document.getElementById("door-out");
+            this.doorOutCount = document.getElementById("door-out-count");
+            this.queueCountEl = document.getElementById("queue-count");
+
+            this.STUDENT_SIZE = 56;
+            this.MAX_QUEUE_ICONS = 15;
+
+            // Movement tuning (visual speed)
+            this.WALK_SPEED_PX_PER_SEC = 150; // lower = slower
+            this.MIN_MOVE_MS = 450;
+            this.MAX_MOVE_MS = 3200;
+            this.ENTER_OFFSET_PX = 110;
+
+            this.studentEls = new Map(); // id -> { el, status, timeouts: [], pos: {x,y,scale} }
+            this.waitingIds = [];
+            this.serverCooldownUntil = new Map(); // serverId -> performance.now() ms
+
+            this.exitCount = 0;
+            this._lastState = null;
 
             this.statTotal = document.getElementById("stat-total");
             this.statQueue = document.getElementById("stat-queue");
@@ -37,6 +60,249 @@
             this.statsOut = document.getElementById("stats-out");
 
             this.hideReport();
+
+            this._ensureQueueSlots(this.MAX_QUEUE_ICONS);
+        }
+
+        _resetExitCountIfNeeded(engineState) {
+            if (!engineState) return;
+            const isFresh = engineState.simTime === 0 && engineState.totalArrived === 0 && engineState.totalServed === 0;
+            if (isFresh) {
+                this.exitCount = 0;
+                this._updateDoorOutCount();
+            }
+        }
+
+        _updateDoorOutCount() {
+            if (!this.doorOutCount) return;
+            this.doorOutCount.textContent = String(this.exitCount);
+        }
+
+        _setQueueCount(value) {
+            if (!this.queueCountEl) return;
+            this.queueCountEl.textContent = `Đang chờ: ${value}`;
+        }
+
+        _setQueueCountPosition(x, y) {
+            if (!this.queueCountEl) return;
+            // Center the badge at (x,y)
+            this.queueCountEl.style.left = `${x}px`;
+            this.queueCountEl.style.top = `${y}px`;
+            this.queueCountEl.style.transform = "translate(-50%, -50%)";
+        }
+
+        _ensureQueueSlots(n) {
+            if (!this.queueArea) return;
+            if (this.queueArea.dataset.slotsInit === "1") return;
+            this.queueArea.innerHTML = "";
+            for (let i = 0; i < n; i++) {
+                const slot = document.createElement("div");
+                slot.className = "queue-slot";
+                this.queueArea.appendChild(slot);
+            }
+            this.queueArea.dataset.slotsInit = "1";
+        }
+
+        _floorRect() {
+            if (!this.floor) return null;
+            return this.floor.getBoundingClientRect();
+        }
+
+        _centerInFloor(el) {
+            const fr = this._floorRect();
+            if (!fr || !el) return { x: 0, y: 0 };
+            const r = el.getBoundingClientRect();
+            return {
+                x: (r.left - fr.left) + r.width / 2,
+                y: (r.top - fr.top) + r.height / 2,
+            };
+        }
+
+        _setStudentTransform(el, x, y, scale) {
+            const half = this.STUDENT_SIZE / 2;
+            const tx = x - half;
+            const ty = y - half;
+            el.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+        }
+
+        _dist(a, b) {
+            const dx = (a.x - b.x);
+            const dy = (a.y - b.y);
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        _durationForMove(from, to) {
+            const d = this._dist(from, to);
+            const ms = (d / Math.max(1, this.WALK_SPEED_PX_PER_SEC)) * 1000;
+            return Math.max(this.MIN_MOVE_MS, Math.min(this.MAX_MOVE_MS, ms));
+        }
+
+        _clearStudentTimeouts(rec) {
+            if (!rec || !rec.timeouts) return;
+            for (const t of rec.timeouts) clearTimeout(t);
+            rec.timeouts.length = 0;
+        }
+
+        _moveStudent(id, x, y, scale, durationMs) {
+            const rec = this.studentEls.get(id);
+            if (!rec) return 0;
+
+            const from = rec.pos || { x, y, scale: scale ?? 1 };
+            const to = { x, y, scale: scale ?? 1 };
+            const dur = Number.isFinite(durationMs) ? durationMs : this._durationForMove(from, to);
+
+            rec.el.style.transitionTimingFunction = "linear";
+            rec.el.style.transitionDuration = `${Math.max(50, dur)}ms`;
+            this._setStudentTransform(rec.el, x, y, scale);
+            rec.pos = { x, y, scale };
+
+            return dur;
+        }
+
+        _removeStudent(id) {
+            const rec = this.studentEls.get(id);
+            if (!rec) return;
+            this._clearStudentTimeouts(rec);
+            rec.el.remove();
+            this.studentEls.delete(id);
+        }
+
+        _spawnStudentAtDoorIn(id) {
+            if (!this.studentsLayer) return;
+            if (this.studentEls.has(id)) return;
+
+            const el = document.createElement("div");
+            // Appear at the entrance door, then walk to the waiting line.
+            el.className = "student waiting";
+            el.title = `SV #${id}`;
+            this.studentsLayer.appendChild(el);
+
+            const pDoor = this._centerInFloor(this.doorIn);
+
+            this._setStudentTransform(el, pDoor.x, pDoor.y, 1);
+
+            const rec = { el, status: "waiting", timeouts: [], pos: { x: pDoor.x, y: pDoor.y, scale: 1 } };
+            this.studentEls.set(id, rec);
+        }
+
+        _queueSlotCenters() {
+            const fr = this._floorRect();
+            if (!fr || !this.queueArea) return [];
+            const slots = Array.from(this.queueArea.querySelectorAll(".queue-slot"));
+            return slots.map((s) => {
+                const r = s.getBoundingClientRect();
+                return {
+                    x: (r.left - fr.left) + r.width / 2,
+                    y: (r.top - fr.top) + r.height / 2,
+                };
+            });
+        }
+
+        _layoutQueue() {
+            // Visual queue: always show all waiting students in front of the counters
+            // (two columns aligned with Quầy 1 & Quầy 2 when available).
+            const state = this._lastState;
+            const nServers = state && state.servers ? state.servers.length : 2;
+            const cols = Math.max(1, Math.min(2, nServers));
+
+            const icons = [];
+            for (let i = 1; i <= cols; i++) {
+                const el = this._counterIconEl(i);
+                if (el) icons.push(this._centerInFloor(el));
+            }
+
+            // Fallback: if counter icons not ready yet, use old queue slots.
+            if (icons.length === 0) {
+                const centers = this._queueSlotCenters();
+                const max = Math.min(this.waitingIds.length, centers.length);
+                for (let i = 0; i < max; i++) {
+                    const id = this.waitingIds[i];
+                    const rec = this.studentEls.get(id);
+                    if (!rec) continue;
+                    if (rec.status !== "waiting") continue;
+                    const p = centers[i];
+                    this._moveStudent(id, p.x, p.y, 1);
+                }
+                return;
+            }
+
+            const startY = Math.max(0, Math.max(...icons.map((p) => p.y)) + 86);
+            const rowGap = 64;
+
+            for (let i = 0; i < this.waitingIds.length; i++) {
+                const id = this.waitingIds[i];
+                const rec = this.studentEls.get(id);
+                if (!rec) continue;
+                if (rec.status !== "waiting") continue;
+
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                const anchor = icons[Math.min(col, icons.length - 1)];
+                const x = anchor.x;
+                const y = startY + row * rowGap;
+                this._moveStudent(id, x, y, 1);
+            }
+        }
+
+        _counterIconEl(serverId) {
+            return document.getElementById(`counter-icon-${serverId}`);
+        }
+
+        _animateAssigned(serverId, studentId, delayMs) {
+            const rec = this.studentEls.get(studentId);
+            if (!rec) return;
+            this._clearStudentTimeouts(rec);
+            rec.status = "toCounter";
+            rec.el.classList.remove("waiting");
+
+            const run = () => {
+                const icon = this._counterIconEl(serverId);
+                const target = this._centerInFloor(icon);
+                // approach
+                const approach = { x: target.x, y: target.y + 12 };
+                const approachMs = this._moveStudent(studentId, approach.x, approach.y, 1);
+                // shrink into the desk (slower so it feels like walking into the counter)
+                const t1 = setTimeout(() => {
+                    this._moveStudent(studentId, target.x, target.y + 6, 0.35, 650);
+                    rec.status = "serving";
+                }, approachMs + 60);
+                rec.timeouts.push(t1);
+            };
+
+            const t0 = setTimeout(run, Math.max(0, delayMs || 0));
+            rec.timeouts.push(t0);
+        }
+
+        _animateFinished(serverId, studentId) {
+            const rec = this.studentEls.get(studentId);
+            if (!rec) return;
+            this._clearStudentTimeouts(rec);
+            rec.status = "toExit";
+
+            if (!rec.exitCounted) {
+                rec.exitCounted = true;
+                this.exitCount += 1;
+                this._updateDoorOutCount();
+            }
+
+            const icon = this._counterIconEl(serverId);
+            const pDesk = icon ? this._centerInFloor(icon) : this._centerInFloor(this.doorIn);
+            const pBehind = { x: pDesk.x, y: Math.max(20, pDesk.y - 70) };
+            const pOut = this._centerInFloor(this.doorOut);
+
+            // Step 1: move behind the counter ("walk around")
+            const behindMs = this._moveStudent(studentId, pBehind.x, pBehind.y, 0.5);
+            const outMs = this._durationForMove(pBehind, pOut);
+
+            // Step 2: go to exit door
+            const t1 = setTimeout(() => {
+                this._moveStudent(studentId, pOut.x, pOut.y, 0.75);
+            }, behindMs + 60);
+            const t2 = setTimeout(() => {
+                this._removeStudent(studentId);
+            }, behindMs + outMs + 200);
+
+            rec.timeouts.push(t1, t2);
         }
 
         hideReport() {
@@ -53,28 +319,48 @@
         }
 
         render(engineState, metrics, events) {
-            const { justAssigned = [], justFinished = [] } = events || {};
+            const { arrivals = [], justAssigned = [], justFinished = [], balked = [], reneged = [] } = events || {};
+
+            this._lastState = engineState;
+            this._resetExitCountIfNeeded(engineState);
+
+            // Ensure queue slots exist even if DOM was reset
+            this._ensureQueueSlots(this.MAX_QUEUE_ICONS);
 
             // Hàng đợi hiển thị: nếu multi-queue thì hiển thị tổng (gọn)
             const queueLen = engineState.config.policy === "multi_queue_shortest"
                 ? engineState.servers.reduce((sum, s) => sum + s.queueLength, 0)
                 : engineState.singleQueueLength;
 
-            this.queueArea.innerHTML = "";
-            const maxIcons = 15;
-            const showCount = Math.min(maxIcons, queueLen);
-            for (let i = 0; i < showCount; i++) {
-                const el = document.createElement("div");
-                el.className = "customer waiting";
-                el.title = "Sinh viên đang chờ";
-                this.queueArea.appendChild(el);
+            this._setQueueCount(queueLen);
+
+            // Spawn students on arrival (at door-in) and add to local waiting list
+            for (const c of arrivals) {
+                this._spawnStudentAtDoorIn(c.id);
+                this.waitingIds.push(c.id);
+            }
+
+            // Remove balked students immediately (they never enter the system)
+            for (const c of balked) {
+                // not spawned by default (only enqueued arrivals are spawned)
+                // but keep safe if future logic changes
+                this._removeStudent(c.id);
+                const idx = this.waitingIds.indexOf(c.id);
+                if (idx >= 0) this.waitingIds.splice(idx, 1);
+            }
+
+            // Remove reneged students (they leave the queue)
+            for (const c of reneged) {
+                this._animateFinished(0, c.id); // fallback path to door-out
+                const idx = this.waitingIds.indexOf(c.id);
+                if (idx >= 0) this.waitingIds.splice(idx, 1);
             }
 
             // Sinh viên vừa xử lý xong
             this.servedArea.innerHTML = "";
             for (const c of engineState.recentServed) {
                 const el = document.createElement("div");
-                el.className = "customer served";
+                el.className = "student served";
                 el.title = `SV #${c.id} đã xử lý xong`;
                 this.servedArea.appendChild(el);
             }
@@ -83,6 +369,12 @@
             this.countersContainer.innerHTML = "";
             const assignedSet = new Set(justAssigned.map((e) => e.serverId));
             const finishedSet = new Set(justFinished.map((e) => e.serverId));
+
+            const nowMs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+            for (const e of justFinished) {
+                // allow a short visible "free" state before next student goes in
+                this.serverCooldownUntil.set(e.serverId, nowMs + 750);
+            }
 
             for (const server of engineState.servers) {
                 const card = document.createElement("div");
@@ -93,14 +385,23 @@
                 name.textContent = `Quầy ${server.id}`;
 
                 const icon = document.createElement("div");
-                let iconClass = "counter-icon " + (server.current ? "busy" : "free");
+                icon.id = `counter-icon-${server.id}`;
+
+                const cooldownUntil = this.serverCooldownUntil.get(server.id) || 0;
+                const inCooldown = nowMs < cooldownUntil;
+
+                // Visual priority: just finished => show free for a moment
+                const visualBusy = Boolean(server.current) && !inCooldown;
+                let iconClass = "counter-icon " + (visualBusy ? "busy" : "free");
                 if (assignedSet.has(server.id)) iconClass += " entering";
                 if (finishedSet.has(server.id)) iconClass += " leaving";
                 icon.className = iconClass;
 
                 const status = document.createElement("div");
                 status.className = "counter-status";
-                if (server.current) {
+                if (inCooldown) {
+                    status.textContent = "Đang trả quầy...";
+                } else if (server.current) {
                     status.textContent = `Đang phục vụ SV #${server.current.id}`;
                 } else {
                     const extra = engineState.config.policy === "multi_queue_shortest"
@@ -113,6 +414,54 @@
                 card.appendChild(icon);
                 card.appendChild(status);
                 this.countersContainer.appendChild(card);
+            }
+
+            // Handle assignments and finishes with animation
+            for (const e of justAssigned) {
+                const id = e.student && e.student.id;
+                if (!id) continue;
+                // ensure exists
+                this._spawnStudentAtDoorIn(id);
+
+                // remove from waiting list (priority/multi-queue safe)
+                const idx = this.waitingIds.indexOf(id);
+                if (idx >= 0) this.waitingIds.splice(idx, 1);
+
+                const cooldownUntil = this.serverCooldownUntil.get(e.serverId) || 0;
+                const delay = Math.max(0, cooldownUntil - nowMs);
+                this._animateAssigned(e.serverId, id, delay);
+            }
+
+            for (const e of justFinished) {
+                const id = e.student && e.student.id;
+                if (!id) continue;
+                this._animateFinished(e.serverId, id);
+            }
+
+            // Layout waiting students (smoothly move forward)
+            this._layoutQueue();
+
+            // Position queue counter badge near the waiting line (between the two counters if possible)
+            try {
+                const nServers = engineState && engineState.servers ? engineState.servers.length : 2;
+                const cols = Math.max(1, Math.min(2, nServers));
+                const icons = [];
+                for (let i = 1; i <= cols; i++) {
+                    const el = this._counterIconEl(i);
+                    if (el) icons.push(this._centerInFloor(el));
+                }
+
+                if (icons.length > 0) {
+                    const x = icons.length === 1 ? icons[0].x : (icons[0].x + icons[1].x) / 2;
+                    const y = Math.max(...icons.map((p) => p.y)) + 52;
+                    this._setQueueCountPosition(x, y);
+                } else {
+                    // fallback: use queue-area center
+                    const p = this._centerInFloor(this.queueArea);
+                    this._setQueueCountPosition(p.x, p.y - 18);
+                }
+            } catch (_) {
+                // ignore positioning errors
             }
 
             // Stats

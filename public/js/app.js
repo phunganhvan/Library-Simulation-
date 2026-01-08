@@ -34,7 +34,7 @@
         const msgs = [];
         const cv = mean !== 0 ? sd / Math.abs(mean) : 0;
         if (n < 30) msgs.push({ cls: "warn", text: "Số lần mô phỏng < 30 → CI có thể rộng." });
-        if (mean !== 0 && cv > 0.3) msgs.push({ cls: "warn", text: "CV > 30% → tăng số lần mô phỏng hoặc điều chỉnh tham số." });
+        if (mean !== 0 && cv > 0.3) msgs.push({ cls: "warn", text: "Hệ số biến thiên (CV) > 30% → tăng số lần mô phỏng hoặc điều chỉnh tham số." });
         if (mean !== 0 && margin > Math.abs(mean) * 0.3) msgs.push({ cls: "bad", text: "CI quá rộng so với mean (>30%)." });
         if (msgs.length === 0) msgs.push({ cls: "ok", text: "Chỉ báo thống kê ở mức tốt." });
         return msgs;
@@ -241,9 +241,9 @@
 
             const html = `
                 <div><strong>Thống kê ${fmt(s.duration, 0)}s gần nhất</strong> (từ t=${fmt(s.startTime, 0)}s đến ${fmt(s.endTime, 0)}s)</div>
-                <div>Đến: <strong>${s.arrived}</strong> (λ≈${fmt(s.lambdaObs, 3)}/s) • Rời hệ: <strong>${s.served}</strong> (throughput≈${fmt(s.throughput, 3)}/s)</div>
+                <div>Đến: <strong>${s.arrived}</strong> (λ≈${fmt(s.lambdaObs, 3)}/s) • Rời hệ: <strong>${s.served}</strong> (thông lượng≈${fmt(s.throughput, 3)}/s)</div>
                 <div>W≈<strong>${fmt(s.avgWait, 1)}s</strong> • P90≈<strong>${fmt(s.waitP90, 1)}s</strong> • L≈<strong>${fmt(s.avgQueueLength, 2)}</strong> • ρ≈<strong>${fmt(s.utilAvg, 1)}%</strong></div>
-                <div>Balking: <strong>${s.balked}</strong> • Reneging: <strong>${s.reneged}</strong></div>
+                <div>Không vào hệ: <strong>${s.balked}</strong> • Bỏ hàng: <strong>${s.reneged}</strong></div>
             `;
             this.output.renderStatsOut(html);
         }
@@ -271,16 +271,16 @@
 
             const c = snap.config;
             const priorityText = c.priorityEnabled
-                ? `priority=ON(p=${fmt(c.priorityProbability, 2)})`
-                : "priority=OFF";
-            const capText = (Number(c.maxQueue) || 0) > 0 ? `maxQ=${c.maxQueue}` : "maxQ=∞";
-            const patienceText = (Number(c.patienceSeconds) || 0) > 0 ? `patience=${fmt(c.patienceSeconds, 0)}s` : "patience=OFF";
+                ? `ưu tiên=BẬT(p=${fmt(c.priorityProbability, 2)})`
+                : "ưu tiên=TẮT";
+            const capText = (Number(c.maxQueue) || 0) > 0 ? `giới hạn hàng=${c.maxQueue}` : "giới hạn hàng=∞";
+            const patienceText = (Number(c.patienceSeconds) || 0) > 0 ? `ngưỡng bỏ hàng=${fmt(c.patienceSeconds, 0)}s` : "ngưỡng bỏ hàng=TẮT";
 
             this.output.renderStatsOut(
-                `Đã ghi mốc: <span class="tag">${label}</span> @t=${fmt(snap.t, 1)}s (epoch ${snap.epoch}) • ` +
-                `n=${c.servers} • inter-arr=${fmt(c.meanInterArrivalSeconds, 0)}s(${c.arrivalDistribution}) • ` +
-                `service=${fmt(c.meanServiceSeconds, 0)}s(${c.serviceDistribution}) • ` +
-                `policy=${c.policy} • ${priorityText} • ${capText} • ${patienceText}`
+                `Đã ghi mốc: <span class="tag">${label}</span> @t=${fmt(snap.t, 1)}s (đợt ${snap.epoch}) • ` +
+                `n=${c.servers} • khoảng đến TB=${fmt(c.meanInterArrivalSeconds, 0)}s(${c.arrivalDistribution}) • ` +
+                `phục vụ TB=${fmt(c.meanServiceSeconds, 0)}s(${c.serviceDistribution}) • ` +
+                `chính sách=${c.policy} • ${priorityText} • ${capText} • ${patienceText}`
             );
         }
 
@@ -294,9 +294,9 @@
             const html = `
                 <div><strong>Thống kê theo mốc:</strong> ${last.label}</div>
                 <div>Từ t=${fmt(s.startTime, 0)}s đến ${fmt(s.endTime, 0)}s (Δ=${fmt(s.duration, 0)}s)</div>
-                <div>Đến: <strong>${s.arrived}</strong> (λ≈${fmt(s.lambdaObs, 3)}/s) • Rời hệ: <strong>${s.served}</strong> (throughput≈${fmt(s.throughput, 3)}/s)</div>
+                <div>Đến: <strong>${s.arrived}</strong> (λ≈${fmt(s.lambdaObs, 3)}/s) • Rời hệ: <strong>${s.served}</strong> (thông lượng≈${fmt(s.throughput, 3)}/s)</div>
                 <div>W≈<strong>${fmt(s.avgWait, 1)}s</strong> • P90≈<strong>${fmt(s.waitP90, 1)}s</strong> • L≈<strong>${fmt(s.avgQueueLength, 2)}</strong> • ρ≈<strong>${fmt(s.utilAvg, 1)}%</strong></div>
-                <div>Balking: <strong>${s.balked}</strong> • Reneging: <strong>${s.reneged}</strong></div>
+                <div>Không vào hệ: <strong>${s.balked}</strong> • Bỏ hàng: <strong>${s.reneged}</strong></div>
             `;
             this.output.renderStatsOut(html);
         }
@@ -329,7 +329,7 @@
 
             const a = analyzeReplications(this.replications, "avgWait");
             const html = `
-                <div><strong>Đã chạy ${reps} lần</strong> (mỗi lần ${duration}s, base seed ${baseSeed}).</div>
+                <div><strong>Đã chạy ${reps} lần</strong> (mỗi lần ${duration}s, seed gốc ${baseSeed}).</div>
                 <div>Gợi ý: bấm “Phân tích lỗi thống kê” để xem CI/độ ổn định; hoặc “Xuất CSV”.</div>
                 <div>W mean≈<strong>${fmt(a.mean, 1)}s</strong>, CI≈[${fmt(a.ciLow, 1)}; ${fmt(a.ciHigh, 1)}] (sd≈${fmt(a.sd, 1)}).</div>
             `;
@@ -338,7 +338,7 @@
 
         showErrorAnalysis() {
             if (!this.replications || this.replications.length === 0) {
-                this.output.renderStatsOut("Chưa có dữ liệu replication. Hãy bấm ‘Chạy nhiều lần’ trước.");
+                this.output.renderStatsOut("Chưa có dữ liệu chạy lặp. Hãy bấm ‘Chạy nhiều lần’ trước.");
                 return;
             }
 
@@ -346,7 +346,7 @@
                 { key: "avgWait", name: "W" },
                 { key: "avgQueueLength", name: "L" },
                 { key: "utilAvg", name: "ρ" },
-                { key: "throughput", name: "Throughput" },
+                { key: "throughput", name: "Thông lượng" },
             ];
             const analyses = focusKeys.map((k) => ({ ...k, a: analyzeReplications(this.replications, k.key) }));
             const tipsByKey = analyses.map((x) => ({
@@ -389,8 +389,8 @@
                 });
 
                 this.errorSummary.innerHTML = (meta
-                    ? `Replication: <strong>${meta.reps}</strong> lần • duration: <strong>${meta.duration}s</strong> • base seed: <strong>${meta.baseSeed}</strong>`
-                    : `Replication: <strong>${this.replications.length}</strong> lần`) +
+                    ? `Số lần mô phỏng: <strong>${meta.reps}</strong> lần • thời lượng: <strong>${meta.duration}s</strong> • seed gốc: <strong>${meta.baseSeed}</strong>`
+                    : `Số lần mô phỏng: <strong>${this.replications.length}</strong> lần`) +
                     ` • Mức đánh giá: <span class="badge ${overall.cls}">${overall.label}</span>` +
                     `<br>${lines.join("<br>")}`;
             }
@@ -404,7 +404,7 @@
 
         exportCsv() {
             if (!this.replications || this.replications.length === 0) {
-                this.output.renderStatsOut("Chưa có dữ liệu replication để xuất. Hãy bấm ‘Chạy nhiều lần’ trước.");
+                this.output.renderStatsOut("Chưa có dữ liệu chạy lặp để xuất. Hãy bấm ‘Chạy nhiều lần’ trước.");
                 return;
             }
 

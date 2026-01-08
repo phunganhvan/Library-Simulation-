@@ -37,7 +37,7 @@ const TICK_SECONDS = 1; // mỗi bước mô phỏng tương đương 1 giây th
 
 let queue = [];
 let servers = [];
-let nextCustomerId = 1;
+let nextStudentId = 1;
 
 let simTime = 0; // tổng thời gian mô phỏng (giây)
 let totalArrived = 0;
@@ -76,7 +76,7 @@ function resetSimulation() {
     timerId = null;
 
     queue = [];
-    nextCustomerId = 1;
+    nextStudentId = 1;
     simTime = 0;
     totalArrived = 0;
     totalServed = 0;
@@ -117,11 +117,11 @@ function simulateStep() {
     const lambda = 1 / meanInterArrival; // khách / giây
     const probArrival = Math.min(0.95, lambda * TICK_SECONDS);
     if (Math.random() < probArrival) {
-        const customer = {
-            id: nextCustomerId++,
+        const student = {
+            id: nextStudentId++,
             arrivalTime: simTime,
         };
-        queue.push(customer);
+        queue.push(student);
         totalArrived += 1;
     }
 
@@ -138,7 +138,7 @@ function simulateStep() {
             if (server.remainingService <= 0) {
                 // hoàn thành phục vụ
                 if (server.current) {
-                    justFinished.push({ serverId: server.id, customer: server.current });
+                    justFinished.push({ serverId: server.id, student: server.current });
                     recentServed.push({
                         id: server.current.id,
                         finishedAt: simTime,
@@ -161,7 +161,7 @@ function simulateStep() {
 
             server.current = next;
             server.remainingService = randomServiceTime(meanService);
-            justAssigned.push({ serverId: server.id, customer: next });
+            justAssigned.push({ serverId: server.id, student: next });
         }
     });
 
@@ -175,7 +175,7 @@ function render(justAssigned = [], justFinished = []) {
     const showCount = Math.min(maxIcons, queue.length);
     for (let i = 0; i < showCount; i++) {
         const el = document.createElement("div");
-        el.className = "customer waiting";
+        el.className = "student waiting";
         el.title = `SV #${queue[i].id}`;
         queueArea.appendChild(el);
     }
@@ -186,7 +186,7 @@ function render(justAssigned = [], justFinished = []) {
     servedArea.innerHTML = "";
     recentServed.forEach((c) => {
         const el = document.createElement("div");
-        el.className = "customer served";
+        el.className = "student served";
         el.title = `SV #${c.id} đã xử lý xong`;
         servedArea.appendChild(el);
     });

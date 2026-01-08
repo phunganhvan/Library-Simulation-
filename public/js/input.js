@@ -150,7 +150,7 @@
             }
 
             if (!Number.isFinite(maxQueue) || maxQueue < 0) errors.push("Giới hạn hàng chờ tối đa phải ≥ 0.");
-            if (!Number.isFinite(patienceSeconds) || patienceSeconds < 0) errors.push("Patience phải ≥ 0.");
+            if (!Number.isFinite(patienceSeconds) || patienceSeconds < 0) errors.push("Ngưỡng bỏ hàng phải ≥ 0.");
 
             if (!Number.isFinite(winSeconds) || winSeconds < 5 || winSeconds > 600) errors.push("Khoảng thống kê phải trong [5..600] giây.");
             if (!Number.isFinite(repCount) || repCount < 5 || repCount > 200) errors.push("Số lần mô phỏng phải trong [5..200].");

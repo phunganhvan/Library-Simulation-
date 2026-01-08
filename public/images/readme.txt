@@ -1,5 +1,5 @@
 Cho thư mục images (hiện đang dùng dạng SVG):
-- customer.svg: hình khách hàng cầm sách, xếp hàng.
+- student.svg: hình sinh viên cầm sách, xếp hàng.
 - counter.svg: hình quầy mượn sách.
 - floor.svg: nền sàn thư viện.
 - librarian.svg: hình thủ thư.

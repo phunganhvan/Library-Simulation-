@@ -121,21 +121,21 @@
 
         render() {
             drawLineChart(this.queueCtx, this.queueCanvas.width, this.queueCanvas.height, this.seriesQueue, {
-                yLabel: "Queue",
+                yLabel: "Hàng đợi",
                 valueLabel: "L=",
                 decimals: 0,
                 color: "#2563eb",
             });
 
             drawLineChart(this.waitCtx, this.waitCanvas.width, this.waitCanvas.height, this.seriesWait, {
-                yLabel: "Wait(s)",
+                yLabel: "Chờ (s)",
                 valueLabel: "W=",
                 decimals: 1,
                 color: "#16a34a",
             });
 
             drawLineChart(this.utilCtx, this.utilCanvas.width, this.utilCanvas.height, this.seriesUtil, {
-                yLabel: "Util(%)",
+                yLabel: "Sử dụng (%)",
                 valueLabel: "ρ=",
                 decimals: 1,
                 color: "#dc2626",
