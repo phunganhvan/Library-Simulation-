@@ -199,7 +199,7 @@
             this.paused = !this.paused;
             const state = this.engine.getState();
             this.output.renderStatsOut(this.paused
-                ? `<strong>Đang tạm dừng</strong> tại t=${fmt(state.simTime, 0)}s. (Space để tiếp tục)`
+                ? `<strong>Đang tạm dừng</strong> tại t=${fmt(state.simTime, 0)}m. (Space để tiếp tục)`
                 : `<strong>Tiếp tục chạy</strong>...`);
         }
 
@@ -240,9 +240,9 @@
             const s = this.engine.computeWindowStats(win);
 
             const html = `
-                <div><strong>Thống kê ${fmt(s.duration, 0)}s gần nhất</strong> (từ t=${fmt(s.startTime, 0)}s đến ${fmt(s.endTime, 0)}s)</div>
-                <div>Đến: <strong>${s.arrived}</strong> (λ≈${fmt(s.lambdaObs, 3)}/s) • Rời hệ: <strong>${s.served}</strong> (thông lượng≈${fmt(s.throughput, 3)}/s)</div>
-                <div>W≈<strong>${fmt(s.avgWait, 1)}s</strong> • P90≈<strong>${fmt(s.waitP90, 1)}s</strong> • L≈<strong>${fmt(s.avgQueueLength, 2)}</strong> • ρ≈<strong>${fmt(s.utilAvg, 1)}%</strong></div>
+                <div><strong>Thống kê ${fmt(s.duration, 0)}m gần nhất</strong> (từ t=${fmt(s.startTime, 0)}m đến ${fmt(s.endTime, 0)}m)</div>
+                <div>Đến: <strong>${s.arrived}</strong> (λ≈${fmt(s.lambdaObs, 3)}/m) • Rời hệ: <strong>${s.served}</strong> (thông lượng≈${fmt(s.throughput, 3)}/m)</div>
+                <div>W≈<strong>${fmt(s.avgWait, 1)}m</strong> • P90≈<strong>${fmt(s.waitP90, 1)}m</strong> • L≈<strong>${fmt(s.avgQueueLength, 2)}</strong> • ρ≈<strong>${fmt(s.utilAvg, 1)}%</strong></div>
                 <div>Không vào hệ: <strong>${s.balked}</strong> • Bỏ hàng: <strong>${s.reneged}</strong></div>
             `;
             this.output.renderStatsOut(html);
@@ -274,12 +274,12 @@
                 ? `ưu tiên=BẬT(p=${fmt(c.priorityProbability, 2)})`
                 : "ưu tiên=TẮT";
             const capText = (Number(c.maxQueue) || 0) > 0 ? `giới hạn hàng=${c.maxQueue}` : "giới hạn hàng=∞";
-            const patienceText = (Number(c.patienceSeconds) || 0) > 0 ? `ngưỡng bỏ hàng=${fmt(c.patienceSeconds, 0)}s` : "ngưỡng bỏ hàng=TẮT";
+            const patienceText = (Number(c.patienceSeconds) || 0) > 0 ? `ngưỡng bỏ hàng=${fmt(c.patienceSeconds, 0)}m` : "ngưỡng bỏ hàng=TẮT";
 
             this.output.renderStatsOut(
-                `Đã ghi mốc: <span class="tag">${label}</span> @t=${fmt(snap.t, 1)}s (đợt ${snap.epoch}) • ` +
-                `n=${c.servers} • khoảng đến TB=${fmt(c.meanInterArrivalSeconds, 0)}s(${c.arrivalDistribution}) • ` +
-                `phục vụ TB=${fmt(c.meanServiceSeconds, 0)}s(${c.serviceDistribution}) • ` +
+                `Đã ghi mốc: <span class="tag">${label}</span> @t=${fmt(snap.t, 1)}m (đợt ${snap.epoch}) • ` +
+                `n=${c.servers} • khoảng đến TB=${fmt(c.meanInterArrivalSeconds, 0)}m(${c.arrivalDistribution}) • ` +
+                `phục vụ TB=${fmt(c.meanServiceSeconds, 0)}m(${c.serviceDistribution}) • ` +
                 `chính sách=${c.policy} • ${priorityText} • ${capText} • ${patienceText}`
             );
         }
@@ -293,9 +293,9 @@
             const s = this.engine.computeStatsSince(last.t);
             const html = `
                 <div><strong>Thống kê theo mốc:</strong> ${last.label}</div>
-                <div>Từ t=${fmt(s.startTime, 0)}s đến ${fmt(s.endTime, 0)}s (Δ=${fmt(s.duration, 0)}s)</div>
-                <div>Đến: <strong>${s.arrived}</strong> (λ≈${fmt(s.lambdaObs, 3)}/s) • Rời hệ: <strong>${s.served}</strong> (thông lượng≈${fmt(s.throughput, 3)}/s)</div>
-                <div>W≈<strong>${fmt(s.avgWait, 1)}s</strong> • P90≈<strong>${fmt(s.waitP90, 1)}s</strong> • L≈<strong>${fmt(s.avgQueueLength, 2)}</strong> • ρ≈<strong>${fmt(s.utilAvg, 1)}%</strong></div>
+                <div>Từ t=${fmt(s.startTime, 0)}m đến ${fmt(s.endTime, 0)}m (Δ=${fmt(s.duration, 0)}m)</div>
+                <div>Đến: <strong>${s.arrived}</strong> (λ≈${fmt(s.lambdaObs, 3)}/m) • Rời hệ: <strong>${s.served}</strong> (thông lượng≈${fmt(s.throughput, 3)}/m)</div>
+                <div>W≈<strong>${fmt(s.avgWait, 1)}m</strong> • P90≈<strong>${fmt(s.waitP90, 1)}m</strong> • L≈<strong>${fmt(s.avgQueueLength, 2)}</strong> • ρ≈<strong>${fmt(s.utilAvg, 1)}%</strong></div>
                 <div>Không vào hệ: <strong>${s.balked}</strong> • Bỏ hàng: <strong>${s.reneged}</strong></div>
             `;
             this.output.renderStatsOut(html);
@@ -315,23 +315,24 @@
             const cfg = this.input.getConfig();
             const duration = Math.max(5, Math.floor(this.input.getWinSeconds()));
             const reps = Math.max(5, Math.min(200, Math.floor(this.input.getReplicationCount())));
+            const warmupSeconds = Math.max(0, Math.floor(this.input.getWarmupSeconds()));
             const baseSeed = Date.now() >>> 0;
 
             const result = window.SimulationEngine.runReplications(cfg, {
                 reps,
                 runSeconds: duration,
-                warmupSeconds: 0,
+                warmupSeconds,
                 seed: baseSeed,
             });
 
             this.replications = result.perRep;
-            this.lastReplicationMeta = { reps, duration, baseSeed };
+            this.lastReplicationMeta = { reps, duration, warmupSeconds, baseSeed };
 
             const a = analyzeReplications(this.replications, "avgWait");
             const html = `
-                <div><strong>Đã chạy ${reps} lần</strong> (mỗi lần ${duration}s, seed gốc ${baseSeed}).</div>
+                <div><strong>Đã chạy ${reps} lần</strong> (warm-up ${warmupSeconds}m + đo ${duration}m, seed gốc ${baseSeed}).</div>
                 <div>Gợi ý: bấm “Phân tích lỗi thống kê” để xem CI/độ ổn định; hoặc “Xuất CSV”.</div>
-                <div>W mean≈<strong>${fmt(a.mean, 1)}s</strong>, CI≈[${fmt(a.ciLow, 1)}; ${fmt(a.ciHigh, 1)}] (sd≈${fmt(a.sd, 1)}).</div>
+                <div>W mean≈<strong>${fmt(a.mean, 1)}m</strong>, CI≈[${fmt(a.ciLow, 1)}; ${fmt(a.ciHigh, 1)}] (sd≈${fmt(a.sd, 1)}).</div>
             `;
             this.output.renderStatsOut(html);
         }
@@ -383,13 +384,13 @@
             if (this.errorSummary) {
                 const meta = this.lastReplicationMeta;
                 const lines = analyses.map((x) => {
-                    const unit = x.key === "utilAvg" ? "%" : (x.key === "throughput" ? "/s" : (x.key === "avgQueueLength" ? "" : "s"));
+                    const unit = x.key === "utilAvg" ? "%" : (x.key === "throughput" ? "/m" : (x.key === "avgQueueLength" ? "" : "m"));
                     const digits = x.key === "throughput" ? 3 : (x.key === "avgQueueLength" ? 2 : 1);
                     return `${x.name}: mean=${fmt(x.a.mean, digits)}${unit}, CI=[${fmt(x.a.ciLow, digits)}; ${fmt(x.a.ciHigh, digits)}], sd=${fmt(x.a.sd, digits)}`;
                 });
 
                 this.errorSummary.innerHTML = (meta
-                    ? `Số lần mô phỏng: <strong>${meta.reps}</strong> lần • thời lượng: <strong>${meta.duration}s</strong> • seed gốc: <strong>${meta.baseSeed}</strong>`
+                    ? `Số lần mô phỏng: <strong>${meta.reps}</strong> lần • warm-up: <strong>${meta.warmupSeconds || 0}m</strong> • thời lượng đo: <strong>${meta.duration}m</strong> • seed gốc: <strong>${meta.baseSeed}</strong>`
                     : `Số lần mô phỏng: <strong>${this.replications.length}</strong> lần`) +
                     ` • Mức đánh giá: <span class="badge ${overall.cls}">${overall.label}</span>` +
                     `<br>${lines.join("<br>")}`;
@@ -425,7 +426,9 @@
             });
 
             const meta = this.lastReplicationMeta;
-            const metaLine = meta ? `# reps=${meta.reps}, duration=${meta.duration}s, baseSeed=${meta.baseSeed}` : "";
+            const metaLine = meta
+                ? `# reps=${meta.reps}, warmup=${meta.warmupSeconds || 0}m, duration=${meta.duration}m, seed gốc=${meta.baseSeed}`
+                : "";
             const csv = [metaLine, header, ...lines].filter(Boolean).join("\n");
 
             const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });

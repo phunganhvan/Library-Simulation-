@@ -23,11 +23,11 @@
                             <input id="input-servers" type="number" min="1" max="6" value="2" />
                         </label>
                         <label>
-                            Thời gian giữa 2 sinh viên đến (giây):
+                            Thời gian giữa 2 sinh viên đến (phút):
                             <input id="input-arrival" type="number" min="1" value="4" />
                         </label>
                         <label>
-                            Thời gian phục vụ TB 1 sinh viên (giây):
+                            Thời gian phục vụ TB 1 sinh viên (phút):
                             <input id="input-service" type="number" min="2" value="20" />
                         </label>
                         <label>
@@ -81,7 +81,7 @@
                             <span class="hint">(0 = không giới hạn)</span>
                         </label>
                         <label>
-                            Ngưỡng bỏ hàng (giây):
+                            Ngưỡng bỏ hàng (phút):
                             <input id="input-patience" type="number" min="0" value="0" />
                             <span class="hint">(0 = không bỏ hàng)</span>
                         </label>
@@ -110,7 +110,8 @@
                                 </li>
                                 <li><strong>Giới hạn hàng chờ</strong>: nếu &gt; 0, khi hàng đầy thì SV mới đến sẽ
                                     <em>không
-                                        vào hệ thống</em>.</li>
+                                        vào hệ thống</em>.
+                                </li>
                                 <li><strong>Ngưỡng bỏ hàng</strong>: nếu &gt; 0, SV đang chờ quá ngưỡng sẽ <em>bỏ
                                         hàng</em>.</li>
                             </ul>
@@ -140,12 +141,12 @@
                     <h3>Thống kê &amp; Chạy lặp</h3>
                     <div class="control-group">
                         <label>
-                            Khoảng (s):
+                            Khoảng (m):
                             <input id="input-win-seconds" type="number" min="5" max="600" step="5" value="60" />
                         </label>
                         <div class="control-buttons">
                             <button id="btn-window-stats" type="button"
-                                data-tooltip="Tính thống kê trong X giây gần nhất (cửa sổ thời gian)">Thống kê</button>
+                                data-tooltip="Tính thống kê trong X phút gần nhất (cửa sổ thời gian)">Thống kê</button>
                         </div>
                     </div>
 
@@ -179,6 +180,10 @@
                             Số lần mô phỏng:
                             <input id="input-rep-count" type="number" min="5" max="200" step="1" value="30" />
                         </label>
+                        <label>
+                            Warm-up (m):
+                            <input id="input-warmup-seconds" type="number" min="0" max="3600" step="5" value="0" />
+                        </label>
                         <div class="control-buttons">
                             <button id="btn-run-rep" type="button"
                                 data-tooltip="Chạy lặp N lần để đánh giá độ ổn định và khoảng tin cậy">Chạy nhiều
@@ -205,15 +210,15 @@
                     <div>Đang được phục vụ: <span id="stat-current">0</span></div>
                     <div>Không vào hệ thống: <span id="stat-balked">0</span></div>
                     <div>Bỏ hàng: <span id="stat-reneged">0</span></div>
-                    <div>Thời gian mô phỏng (giây): <span id="stat-sim-time">0</span></div>
-                    <div>Thời gian chờ TB (giây): <span id="stat-wait-avg">0</span></div>
-                    <div>Thời gian chờ P50 (giây): <span id="stat-wait-p50">0</span></div>
-                    <div>Thời gian chờ P90 (giây): <span id="stat-wait-p90">0</span></div>
+                    <div>Thời gian mô phỏng (phút): <span id="stat-sim-time">0</span></div>
+                    <div>Thời gian chờ TB (phút): <span id="stat-wait-avg">0</span></div>
+                    <div>Thời gian chờ P50 (phút): <span id="stat-wait-p50">0</span></div>
+                    <div>Thời gian chờ P90 (phút): <span id="stat-wait-p90">0</span></div>
                     <div>Độ dài hàng đợi TB: <span id="stat-queue-avg">0</span></div>
                     <div>Mức sử dụng quầy TB: <span id="stat-util-avg">0%</span></div>
-                    <div>Tốc độ sinh viên đến λ (SV/giây): <span id="stat-lambda">0</span></div>
-                    <div>Thông lượng hệ thống (sinh viên rời hệ thống/giây): <span id="stat-throughput">0</span></div>
-                    <div>Tốc độ phục vụ TB mỗi quầy µ (SV/giây): <span id="stat-mu">0</span></div>
+                    <div>Tốc độ sinh viên đến λ (SV/phút): <span id="stat-lambda">0</span></div>
+                    <div>Thông lượng hệ thống (sinh viên rời hệ thống/phút): <span id="stat-throughput">0</span></div>
+                    <div>Tốc độ phục vụ TB mỗi quầy µ (SV/phút): <span id="stat-mu">0</span></div>
                 </section>
 
                 <section class="simulation">
@@ -242,7 +247,7 @@
                             <tr>
                                 <th>Quầy</th>
                                 <th>Số SV đã phục vụ</th>
-                                <th>Thời gian bận (giây)</th>
+                                <th>Thời gian bận (phút)</th>
                                 <th>Mức sử dụng (%)</th>
                             </tr>
                         </thead>
@@ -269,14 +274,14 @@
                                         <tr>
                                             <th>#</th>
                                             <th>Seed</th>
-                                            <th>W (s)</th>
+                                            <th>W (m)</th>
                                             <th>L</th>
                                             <th>ρ (%)</th>
                                             <th>Thông lượng</th>
                                             <th>λ</th>
                                             <th>Không vào hệ</th>
                                             <th>Bỏ hàng</th>
-                                            <th>P90 (s)</th>
+                                            <th>P90 (m)</th>
                                         </tr>
                                     </thead>
                                     <tbody></tbody>

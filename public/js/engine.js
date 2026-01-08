@@ -558,7 +558,7 @@
                 const suggestServers = n + 1;
 
                 const reasons = [];
-                if (m.avgWait > 180) reasons.push(`chờ TB cao (≈ ${m.avgWait.toFixed(1)}s)`);
+                if (m.avgWait > 180) reasons.push(`chờ TB cao (≈ ${m.avgWait.toFixed(1)}m)`);
                 if (m.avgQueueLength > 8) reasons.push(`hàng TB dài (≈ ${m.avgQueueLength.toFixed(2)} SV)`);
                 if (m.utilAvg > 90) reasons.push(`mức sử dụng cao (ρ ≈ ${m.utilAvg.toFixed(1)}%)`);
                 const reasonText = reasons.length ? reasons.join(", ") : `ρ ≈ ${m.utilAvg.toFixed(1)}%`;
@@ -570,25 +570,25 @@
 
                 return (
                     `Kết quả cho thấy hệ thống đang căng tải: ${reasonText}. ` +
-                    `Với λ ≈ ${m.lambdaObs.toFixed(3)} SV/giây và năng lực phục vụ n·µ ≈ ${(n * m.muPerServer).toFixed(3)} SV/giây (n = ${n}), ` +
+                    `Với λ ≈ ${m.lambdaObs.toFixed(3)} SV/phút và năng lực phục vụ n·µ ≈ ${(n * m.muPerServer).toFixed(3)} SV/phút (n = ${n}), ` +
                     `nên cân nhắc tăng số quầy lên khoảng ${suggestServers} quầy hoặc rút ngắn thời gian phục vụ ` +
-                    `(ví dụ từ ~${meanServiceSeconds}s xuống ~${suggestedService}s).`
+                    `(ví dụ từ ~${meanServiceSeconds}m xuống ~${suggestedService}m).`
                 );
             }
 
             if (veryLowWait) {
                 const possibleServers = Math.max(1, n - 1);
                 return (
-                    `Thời gian chờ hiện thấp (≈ ${m.avgWait.toFixed(1)}s, hàng TB ≈ ${m.avgQueueLength.toFixed(2)} SV) ` +
+                    `Thời gian chờ hiện thấp (≈ ${m.avgWait.toFixed(1)}m, hàng TB ≈ ${m.avgQueueLength.toFixed(2)} SV) ` +
                     `trong khi mức sử dụng quầy chỉ khoảng ${m.utilAvg.toFixed(1)}%. ` +
                     `Có thể hệ thống đang dư quầy; thử giảm còn ${possibleServers} quầy để tối ưu nhân lực.`
                 );
             }
 
             return (
-                `Các chỉ số cho thấy cấu hình hiện tại khá cân bằng: chờ TB ≈ ${m.avgWait.toFixed(1)}s, ` +
+                `Các chỉ số cho thấy cấu hình hiện tại khá cân bằng: chờ TB ≈ ${m.avgWait.toFixed(1)}m, ` +
                 `hàng đợi TB ≈ ${m.avgQueueLength.toFixed(2)} SV, mức sử dụng ≈ ${m.utilAvg.toFixed(1)}%. ` +
-                `Với λ ≈ ${m.lambdaObs.toFixed(3)} SV/giây và n·µ ≈ ${(n * m.muPerServer).toFixed(3)} SV/giây, số quầy hiện tại (${n}) là hợp lý.`
+                `Với λ ≈ ${m.lambdaObs.toFixed(3)} SV/phút và n·µ ≈ ${(n * m.muPerServer).toFixed(3)} SV/phút, số quầy hiện tại (${n}) là hợp lý.`
             );
         }
 
@@ -601,25 +601,25 @@
             return `
                 <p><strong>1. Thời gian chờ trung bình</strong><br>
                 Gọi <code>W</code> là thời gian chờ trung bình, <code>waitCount</code> là số sinh viên đã được đưa vào quầy,<br>
-                <code>totalWaitTime</code> là tổng thời gian chờ của các sinh viên đó (giây).<br>
+                    <code>totalWaitTime</code> là tổng thời gian chờ của các sinh viên đó (phút).<br>
                 Công thức: <code>W = totalWaitTime / waitCount</code><br>
-                Với số liệu: <code>totalWaitTime = ${this.totalWaitTime.toFixed(1)}s</code>,
-                <code>waitCount = ${this.waitCount}</code> ⇒ <code>W ≈ ${m.avgWait.toFixed(1)}s</code>.</p>
+                    Với số liệu: <code>totalWaitTime = ${this.totalWaitTime.toFixed(1)}m</code>,
+                    <code>waitCount = ${this.waitCount}</code> ⇒ <code>W ≈ ${m.avgWait.toFixed(1)}m</code>.</p>
 
                 <p><strong>2. Độ dài hàng đợi trung bình</strong><br>
-                Mỗi bước thời gian <code>Δt = ${this.TICK_SECONDS}s</code> ta cộng độ dài hàng đợi hiện tại vào biến
+                Mỗi bước thời gian <code>Δt = ${this.TICK_SECONDS}m</code> ta cộng độ dài hàng đợi hiện tại vào biến
                 <code>queueLengthArea</code> (tích phân rời rạc). Gọi <code>L</code> là độ dài hàng đợi trung bình,<br>
                 <code>T'</code> là thời gian đo sau warm-up (nếu có).<br>
                 Công thức: <code>L = queueLengthArea / T'</code><br>
                 Với số liệu: <code>queueLengthArea = ${this.queueLengthArea.toFixed(1)}</code>,
-                <code>T' = ${measuredT.toFixed(0)}s</code> ⇒ <code>L ≈ ${m.avgQueueLength.toFixed(2)}</code>,
+                    <code>T' = ${measuredT.toFixed(0)}m</code> ⇒ <code>L ≈ ${m.avgQueueLength.toFixed(2)}</code>,
                 độ dài lớn nhất quan sát được: <code>${this.maxQueueLength}</code> sinh viên.</p>
 
                 <p><strong>3. Mức sử dụng quầy trung bình</strong><br>
                 Với mỗi quầy <code>i</code>, ta tích lũy thời gian quầy bận vào <code>busyTime[i]</code> (ở đây là <code>server.totalBusyTime</code>).<br>
                 Gọi <code>ρ</code> là mức sử dụng trung bình toàn hệ thống, <code>n</code> là số quầy, <code>T'</code> là thời gian đo sau warm-up.<br>
                 Công thức: <code>ρ = (∑ busyTime[i]) / (n · T')</code><br>
-                Với số liệu: <code>∑busyTime[i] = ${m.totalBusy.toFixed(1)}s</code>, <code>n = ${n}</code>, <code>T' = ${measuredT.toFixed(0)}s</code>
+                    Với số liệu: <code>∑busyTime[i] = ${m.totalBusy.toFixed(1)}m</code>, <code>n = ${n}</code>, <code>T' = ${measuredT.toFixed(0)}m</code>
                 ⇒ <code>ρ ≈ ${m.utilAvg.toFixed(1)}%</code>.</p>
 
                 <p><strong>4. Ưu tiên &amp; ràng buộc hàng chờ</strong><br>
@@ -630,7 +630,7 @@
 
                 <p><strong>5. Phân phối &amp; độ biến động</strong><br>
                 Dòng đến: <code>${this.config.arrivalDistribution}</code>, phục vụ: <code>${this.config.serviceDistribution}</code>.<br>
-                Thời gian chờ phân vị: <code>P50 ≈ ${m.waitP50.toFixed(1)}s</code>, <code>P90 ≈ ${m.waitP90.toFixed(1)}s</code>.
+                Thời gian chờ phân vị: <code>P50 ≈ ${m.waitP50.toFixed(1)}m</code>, <code>P90 ≈ ${m.waitP90.toFixed(1)}m</code>.
                 Phân vị giúp thấy “đuôi dài” (một số SV chờ rất lâu) mà trung bình có thể che mất.</p>
             `;
         }

@@ -37,6 +37,7 @@
             this.btnStatsBySnap = document.getElementById("btn-stats-by-snap");
 
             this.inputRepCount = document.getElementById("input-rep-count");
+            this.inputWarmupSeconds = document.getElementById("input-warmup-seconds");
             this.btnRunRep = document.getElementById("btn-run-rep");
             this.btnErrorAnalysis = document.getElementById("btn-error-analysis");
             this.btnExportCsv = document.getElementById("btn-export-csv");
@@ -78,7 +79,7 @@
                 el.addEventListener("change", () => this._handleConfigChanged());
             });
 
-            [this.inputWinSeconds, this.inputRepCount].forEach((el) => {
+            [this.inputWinSeconds, this.inputRepCount, this.inputWarmupSeconds].forEach((el) => {
                 el.addEventListener("change", () => this._validateOnly());
             });
 
@@ -135,6 +136,7 @@
 
             const winSeconds = Number(this.inputWinSeconds.value);
             const repCount = Number(this.inputRepCount.value);
+            const warmupSeconds = Number(this.inputWarmupSeconds ? this.inputWarmupSeconds.value : 0);
 
             if (!Number.isFinite(servers) || servers < 1 || servers > 6) errors.push("Số quầy phải trong [1..6].");
             if (!Number.isFinite(meanInterArrivalSeconds) || meanInterArrivalSeconds <= 0) errors.push("Thời gian giữa 2 lượt đến (TB) phải > 0.");
@@ -152,8 +154,9 @@
             if (!Number.isFinite(maxQueue) || maxQueue < 0) errors.push("Giới hạn hàng chờ tối đa phải ≥ 0.");
             if (!Number.isFinite(patienceSeconds) || patienceSeconds < 0) errors.push("Ngưỡng bỏ hàng phải ≥ 0.");
 
-            if (!Number.isFinite(winSeconds) || winSeconds < 5 || winSeconds > 600) errors.push("Khoảng thống kê phải trong [5..600] giây.");
+            if (!Number.isFinite(winSeconds) || winSeconds < 5 || winSeconds > 600) errors.push("Khoảng thống kê phải trong [5..600] phút.");
             if (!Number.isFinite(repCount) || repCount < 5 || repCount > 200) errors.push("Số lần mô phỏng phải trong [5..200].");
+            if (!Number.isFinite(warmupSeconds) || warmupSeconds < 0 || warmupSeconds > 3600) errors.push("Warm-up phải trong [0..3600] phút.");
 
             const config = {
                 servers: Number.isFinite(servers) ? servers : 1,
@@ -180,6 +183,11 @@
         getReplicationCount() {
             const n = Number(this.inputRepCount.value);
             return Number.isFinite(n) ? n : 30;
+        }
+
+        getWarmupSeconds() {
+            const s = Number(this.inputWarmupSeconds ? this.inputWarmupSeconds.value : 0);
+            return Number.isFinite(s) ? s : 0;
         }
 
         getSnapshotLabel() {

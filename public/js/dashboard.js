@@ -128,7 +128,7 @@
             });
 
             drawLineChart(this.waitCtx, this.waitCanvas.width, this.waitCanvas.height, this.seriesWait, {
-                yLabel: "Chờ (s)",
+                yLabel: "Chờ (m)",
                 valueLabel: "W=",
                 decimals: 1,
                 color: "#16a34a",

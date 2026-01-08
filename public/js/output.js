@@ -507,7 +507,7 @@
             }
 
             this.reportOverall.textContent =
-                `Mô phỏng ${engineState.simTime.toFixed(0)} giây, tổng ${engineState.totalArrived} sinh viên đến, ` +
+                `Mô phỏng ${engineState.simTime.toFixed(0)} phút, tổng ${engineState.totalArrived} sinh viên đến, ` +
                 `${engineState.totalServed} sinh viên được phục vụ xong.`;
 
             this.reportExplain.innerHTML = engine.buildExplainHtml();
