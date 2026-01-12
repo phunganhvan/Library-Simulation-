@@ -61,7 +61,28 @@
 
             this.hideReport();
 
+            // Create a spacer so the floor can scroll even though students are absolutely positioned.
+            this.floorSpacer = document.getElementById("floor-spacer");
+            if (!this.floorSpacer && this.floor) {
+                this.floorSpacer = document.createElement("div");
+                this.floorSpacer.id = "floor-spacer";
+                this.floorSpacer.className = "floor-spacer";
+                this.floor.appendChild(this.floorSpacer);
+            }
+
             this._ensureQueueSlots(this.MAX_QUEUE_ICONS);
+        }
+
+        _ensureFloorScrollHeight(maxStudentY) {
+            if (!this.floorSpacer) return;
+            const base = 260;
+            if (!Number.isFinite(maxStudentY)) {
+                this.floorSpacer.style.height = `${base}px`;
+                return;
+            }
+            const extra = 220; // space for doors / padding
+            const h = Math.max(base, Math.ceil(maxStudentY + extra));
+            this.floorSpacer.style.height = `${h}px`;
         }
 
         _resetExitCountIfNeeded(engineState) {
@@ -122,7 +143,9 @@
             const half = this.STUDENT_SIZE / 2;
             const tx = x - half;
             const ty = y - half;
+            // Use translate for position, but preserve rotation from walk-tilt animation
             el.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+            el.style.transformOrigin = 'center bottom';
         }
 
         _dist(a, b) {
@@ -151,12 +174,42 @@
             const to = { x, y, scale: scale ?? 1 };
             const dur = Number.isFinite(durationMs) ? durationMs : this._durationForMove(from, to);
 
+            // Add walking animation when moving
+            if (dur > 100 && rec.status !== "serving") {
+                rec.el.classList.add("walking");
+                rec.el.classList.remove("waiting");
+                if (rec.status === "waiting") rec.status = "walking";
+            }
+
             rec.el.style.transitionTimingFunction = "linear";
             rec.el.style.transitionDuration = `${Math.max(50, dur)}ms`;
             this._setStudentTransform(rec.el, x, y, scale);
             rec.pos = { x, y, scale };
 
             return dur;
+        }
+
+        _syncWaitingFromState(engineState) {
+            if (!engineState || !engineState.config) return;
+
+            const policy = engineState.config.policy;
+            const nextWaiting = [];
+
+            if (policy === "multi_queue_shortest") {
+                for (const s of engineState.servers || []) {
+                    const ids = Array.isArray(s.queueIds) ? s.queueIds : [];
+                    for (const id of ids) nextWaiting.push({ id, serverId: s.id });
+                }
+            } else {
+                const ids = Array.isArray(engineState.singleQueueIds) ? engineState.singleQueueIds : [];
+                for (const id of ids) nextWaiting.push({ id, serverId: null });
+            }
+
+            // Ensure all waiting students exist
+            for (const item of nextWaiting) this._spawnStudentAtDoorIn(item.id);
+
+            this.waitingModel = nextWaiting;
+            this.waitingIds = nextWaiting.map((x) => x.id);
         }
 
         _removeStudent(id) {
@@ -173,7 +226,7 @@
 
             const el = document.createElement("div");
             // Appear at the entrance door, then walk to the waiting line.
-            el.className = "student waiting";
+            el.className = "student walking";
             el.title = `SV #${id}`;
             this.studentsLayer.appendChild(el);
 
@@ -181,7 +234,7 @@
 
             this._setStudentTransform(el, pDoor.x, pDoor.y, 1);
 
-            const rec = { el, status: "waiting", timeouts: [], pos: { x: pDoor.x, y: pDoor.y, scale: 1 } };
+            const rec = { el, status: "walking", timeouts: [], pos: { x: pDoor.x, y: pDoor.y, scale: 1 } };
             this.studentEls.set(id, rec);
         }
 
@@ -199,49 +252,102 @@
         }
 
         _layoutQueue() {
-            // Visual queue: always show all waiting students in front of the counters
-            // (two columns aligned with Quầy 1 & Quầy 2 when available).
+            // Visual queue: layout depends on queue policy
             const state = this._lastState;
             const nServers = state && state.servers ? state.servers.length : 2;
-            const cols = Math.max(1, Math.min(2, nServers));
-
+            const policy = state && state.config && state.config.policy ? state.config.policy : "single_queue_fifo";
+            
             const icons = [];
-            for (let i = 1; i <= cols; i++) {
+            for (let i = 1; i <= nServers; i++) {
                 const el = this._counterIconEl(i);
                 if (el) icons.push(this._centerInFloor(el));
             }
 
-            // Fallback: if counter icons not ready yet, use old queue slots.
+            let maxY = 0;
+
+            // Fallback: if counter icons not ready yet, place students near counters container center
             if (icons.length === 0) {
-                const centers = this._queueSlotCenters();
-                const max = Math.min(this.waitingIds.length, centers.length);
-                for (let i = 0; i < max; i++) {
+                const p = this._centerInFloor(this.countersContainer);
+                const startY = Math.max(30, p.y + 86);
+                const rowGap = 64;
+                for (let i = 0; i < this.waitingIds.length; i++) {
                     const id = this.waitingIds[i];
                     const rec = this.studentEls.get(id);
                     if (!rec) continue;
-                    if (rec.status !== "waiting") continue;
-                    const p = centers[i];
-                    this._moveStudent(id, p.x, p.y, 1);
+                    if (rec.status !== "waiting" && rec.status !== "walking") continue;
+                    const dur = this._moveStudent(id, p.x, startY + i * rowGap, 1);
+                    maxY = Math.max(maxY, startY + i * rowGap);
+                    this._scheduleStopWalking(id, dur);
                 }
-                return;
+                return maxY;
             }
 
-            const startY = Math.max(0, Math.max(...icons.map((p) => p.y)) + 86);
-            const rowGap = 64;
+            if (policy === "single_queue_fifo") {
+                // Single FIFO queue: form one line in front of all counters
+                const centerX = icons.reduce((sum, p) => sum + p.x, 0) / icons.length;
+                const startY = Math.max(0, Math.max(...icons.map((p) => p.y)) + 86);
+                const rowGap = 64;
 
-            for (let i = 0; i < this.waitingIds.length; i++) {
-                const id = this.waitingIds[i];
-                const rec = this.studentEls.get(id);
-                if (!rec) continue;
-                if (rec.status !== "waiting") continue;
+                for (let i = 0; i < this.waitingIds.length; i++) {
+                    const id = this.waitingIds[i];
+                    const rec = this.studentEls.get(id);
+                    if (!rec) continue;
+                    if (rec.status !== "waiting" && rec.status !== "walking") continue;
 
-                const col = i % cols;
-                const row = Math.floor(i / cols);
-                const anchor = icons[Math.min(col, icons.length - 1)];
-                const x = anchor.x;
-                const y = startY + row * rowGap;
-                this._moveStudent(id, x, y, 1);
+                    const x = centerX;
+                    const y = startY + i * rowGap;
+                    const dur = this._moveStudent(id, x, y, 1);
+                    maxY = Math.max(maxY, y);
+                    // Stop walking when reached waiting position
+                    this._scheduleStopWalking(id, dur);
+                }
+            } else {
+                // Multi-queue: separate line per counter, using engine-provided queueIds
+                const startY = Math.max(0, Math.max(...icons.map((p) => p.y)) + 86);
+                const rowGap = 64;
+
+                // waitingModel keeps (id, serverId)
+                const model = Array.isArray(this.waitingModel) ? this.waitingModel : [];
+                const byServer = new Map();
+                for (const item of model) {
+                    const sid = item.serverId;
+                    if (!sid) continue;
+                    if (!byServer.has(sid)) byServer.set(sid, []);
+                    byServer.get(sid).push(item.id);
+                }
+
+                for (let sid = 1; sid <= nServers; sid++) {
+                    const anchor = icons[Math.min(sid - 1, icons.length - 1)];
+                    const ids = byServer.get(sid) || [];
+                    for (let j = 0; j < ids.length; j++) {
+                        const id = ids[j];
+                        const rec = this.studentEls.get(id);
+                        if (!rec) continue;
+                        if (rec.status !== "waiting" && rec.status !== "walking") continue;
+                        const x = anchor.x;
+                        const y = startY + j * rowGap;
+                        const dur = this._moveStudent(id, x, y, 1);
+                        maxY = Math.max(maxY, y);
+                        this._scheduleStopWalking(id, dur);
+                    }
+                }
             }
+
+            return maxY;
+        }
+
+        _scheduleStopWalking(id, delayMs) {
+            const rec = this.studentEls.get(id);
+            if (!rec) return;
+            const t = setTimeout(() => {
+                // If the student is still in a waiting/walking phase, stop the walking loop.
+                if (rec.status === "walking" || rec.status === "waiting") {
+                    rec.status = "waiting";
+                    rec.el.classList.remove("walking");
+                    rec.el.classList.add("waiting");
+                }
+            }, delayMs + 100);
+            rec.timeouts.push(t);
         }
 
         _counterIconEl(serverId) {
@@ -254,6 +360,7 @@
             this._clearStudentTimeouts(rec);
             rec.status = "toCounter";
             rec.el.classList.remove("waiting");
+            rec.el.classList.add("walking");
 
             const run = () => {
                 const icon = this._counterIconEl(serverId);
@@ -263,6 +370,7 @@
                 const approachMs = this._moveStudent(studentId, approach.x, approach.y, 1);
                 // shrink into the desk (slower so it feels like walking into the counter)
                 const t1 = setTimeout(() => {
+                    rec.el.classList.remove("walking");
                     this._moveStudent(studentId, target.x, target.y + 6, 0.35, 650);
                     rec.status = "serving";
                 }, approachMs + 60);
@@ -278,6 +386,7 @@
             if (!rec) return;
             this._clearStudentTimeouts(rec);
             rec.status = "toExit";
+            rec.el.classList.add("walking");
 
             if (!rec.exitCounted) {
                 rec.exitCounted = true;
@@ -324,6 +433,9 @@
             this._lastState = engineState;
             this._resetExitCountIfNeeded(engineState);
 
+            // Sync visual waiting list from engine state (FIFO / multi-queue)
+            this._syncWaitingFromState(engineState);
+
             // Ensure queue slots exist even if DOM was reset
             this._ensureQueueSlots(this.MAX_QUEUE_ICONS);
 
@@ -337,7 +449,7 @@
             // Spawn students on arrival (at door-in) and add to local waiting list
             for (const c of arrivals) {
                 this._spawnStudentAtDoorIn(c.id);
-                this.waitingIds.push(c.id);
+                // waitingIds is derived from engine state now
             }
 
             // Remove balked students immediately (they never enter the system)
@@ -439,7 +551,8 @@
             }
 
             // Layout waiting students (smoothly move forward)
-            this._layoutQueue();
+            const maxY = this._layoutQueue();
+            this._ensureFloorScrollHeight(maxY);
 
             // Position queue counter badge near the waiting line (between the two counters if possible)
             try {

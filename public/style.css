@@ -458,10 +458,21 @@ button[data-tooltip]:focus-visible::before {
 
 .floor {
     position: relative;
+    height: 420px;
+    max-height: 70vh;
     min-height: 260px;
     border-radius: 10px;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     background: linear-gradient(135deg, #e3f2ff, #f7fbff);
+}
+
+/* Spacer to create internal scroll height for absolutely-positioned students */
+.floor-spacer {
+    width: 1px;
+    height: 260px;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .students-layer {
@@ -620,29 +631,67 @@ button[data-tooltip]:focus-visible::before {
 }
 
 .student {
-    width: 56px;
-    height: 56px;
-    background-image: url("/images/student.svg?v=3");
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.3));
-}
-
-.student {
     position: absolute;
     left: 0;
     top: 0;
     z-index: 9;
+    width: 56px;
+    height: 56px;
     transition: transform 0.85s linear;
     will-change: transform;
 }
 
-.student.waiting {
+/* Render the student sprite on a child layer so animations don't conflict with JS translate/scale */
+.student::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("/images/student.png");
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.30));
+    transform-origin: center bottom;
+    will-change: transform, filter;
+}
+
+/* Walking animation: alternate left/right step feel ("đổi chân") */
+@keyframes walk-step {
+    0% {
+        transform: translateY(0) rotate(-2deg) skewX(-2deg) scaleX(0.99);
+        filter: drop-shadow(-1px 5px 6px rgba(0, 0, 0, 0.25));
+    }
+    25% {
+        transform: translateY(-4px) rotate(-6deg) skewX(-4deg) scaleX(1.02);
+        filter: drop-shadow(-2px 3px 5px rgba(0, 0, 0, 0.35));
+    }
+    50% {
+        transform: translateY(0) rotate(2deg) skewX(2deg) scaleX(0.99);
+        filter: drop-shadow(1px 5px 6px rgba(0, 0, 0, 0.25));
+    }
+    75% {
+        transform: translateY(-4px) rotate(6deg) skewX(4deg) scaleX(1.02);
+        filter: drop-shadow(2px 3px 5px rgba(0, 0, 0, 0.35));
+    }
+    100% {
+        transform: translateY(0) rotate(-2deg) skewX(-2deg) scaleX(0.99);
+        filter: drop-shadow(-1px 5px 6px rgba(0, 0, 0, 0.25));
+    }
+}
+
+.student.walking::before {
+    animation: walk-step 420ms ease-in-out infinite;
+}
+
+.student.waiting::before {
     animation: queue-breathe 1.4s ease-in-out infinite alternate;
 }
 
 .student.served {
+    opacity: 0.7;
+}
+
+.student.served::before {
     filter: grayscale(0.9) drop-shadow(0 4px 5px rgba(0, 0, 0, 0.2));
     opacity: 0.7;
     animation: served-exit 4s ease-out forwards;

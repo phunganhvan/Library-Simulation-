@@ -299,6 +299,7 @@
         }
 
         getState() {
+            const VIS_QUEUE_CAP = 60; // only for visualization, keep small
             return {
                 config: { ...this.config },
                 simTime: this.simTime,
@@ -315,8 +316,10 @@
                     totalBusyTime: s.totalBusyTime,
                     completed: s.completed,
                     queueLength: s.queue.length,
+                    queueIds: s.queue.slice(0, VIS_QUEUE_CAP).map((c) => c.id),
                 })),
                 singleQueueLength: this.singleQueue.length,
+                singleQueueIds: this.singleQueue.slice(0, VIS_QUEUE_CAP).map((c) => c.id),
                 recentServed: [...this.recentServed],
             };
         }
