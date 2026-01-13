@@ -22,13 +22,19 @@
             this.STUDENT_SIZE = 56;
             this.MAX_QUEUE_ICONS = 15;
 
+            // Sprite frame timing (ms)
+            this.WALK_FRAME_MS = 160;
+
             // Movement tuning (visual speed)
             this.WALK_SPEED_PX_PER_SEC = 150; // lower = slower
             this.MIN_MOVE_MS = 450;
             this.MAX_MOVE_MS = 3200;
             this.ENTER_OFFSET_PX = 110;
 
-            this.studentEls = new Map(); // id -> { el, status, timeouts: [], pos: {x,y,scale} }
+            // Face-to-face tuning at counter
+            this.COUNTER_FACE_OFFSET_PX = 12;
+
+            this.studentEls = new Map(); // id -> { el, spriteEl, gender, frameIdx, walkTimer, walkPhase, status, timeouts: [], pos }
             this.waitingIds = [];
             this.serverCooldownUntil = new Map(); // serverId -> performance.now() ms
 
@@ -143,9 +149,65 @@
             const half = this.STUDENT_SIZE / 2;
             const tx = x - half;
             const ty = y - half;
-            // Use translate for position, but preserve rotation from walk-tilt animation
             el.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
-            el.style.transformOrigin = 'center bottom';
+        }
+
+        _studentGenderForId(id) {
+            // deterministic (stable): odd=male, even=female
+            return (Number(id) % 2 === 1) ? "male" : "female";
+        }
+
+        _spriteUrl(gender, frameIdx) {
+            const g = (gender === "female") ? "female" : "male";
+            const f = Math.max(1, Math.min(3, Number(frameIdx) || 1));
+            return `/images/student_${g}_frame${f}.png`;
+        }
+
+        _setSpriteFrame(rec, frameIdx) {
+            if (!rec || !rec.spriteEl) return;
+            rec.frameIdx = frameIdx;
+            rec.spriteEl.style.backgroundImage = `url("${this._spriteUrl(rec.gender, frameIdx)}")`;
+        }
+
+        _startWalking(rec) {
+            if (!rec || rec.walkTimer) return;
+            rec.walkPhase = 0;
+            this._setSpriteFrame(rec, 2);
+            rec.walkTimer = setInterval(() => {
+                rec.walkPhase = (rec.walkPhase + 1) % 2;
+                this._setSpriteFrame(rec, rec.walkPhase === 0 ? 2 : 3);
+            }, this.WALK_FRAME_MS);
+        }
+
+        _stopWalking(rec) {
+            if (!rec) return;
+            if (rec.walkTimer) {
+                clearInterval(rec.walkTimer);
+                rec.walkTimer = null;
+            }
+            // Idle frame when standing still
+            this._setSpriteFrame(rec, 1);
+        }
+
+        _createStudentEl(id, gender) {
+            const el = document.createElement("div");
+            el.className = "student";
+            el.title = `SV #${id}`;
+
+            const spriteEl = document.createElement("div");
+            spriteEl.className = "student-sprite";
+            el.appendChild(spriteEl);
+
+            // initial sprite
+            spriteEl.style.backgroundImage = `url("${this._spriteUrl(gender, 1)}")`;
+            return { el, spriteEl };
+        }
+
+        _setFacing(rec, dir) {
+            if (!rec || !rec.el) return;
+            rec.el.classList.remove("facing-left", "facing-right");
+            if (dir === "left") rec.el.classList.add("facing-left");
+            if (dir === "right") rec.el.classList.add("facing-right");
         }
 
         _dist(a, b) {
@@ -172,13 +234,23 @@
 
             const from = rec.pos || { x, y, scale: scale ?? 1 };
             const to = { x, y, scale: scale ?? 1 };
-            const dur = Number.isFinite(durationMs) ? durationMs : this._durationForMove(from, to);
 
-            // Add walking animation when moving
-            if (dur > 100 && rec.status !== "serving") {
-                rec.el.classList.add("walking");
-                rec.el.classList.remove("waiting");
+            const d = this._dist(from, to);
+            const scaleSame = Math.abs((from.scale ?? 1) - (to.scale ?? 1)) < 1e-6;
+            const isReallyMoving = d >= 1 || !scaleSame;
+            const dur = Number.isFinite(durationMs)
+                ? durationMs
+                : (isReallyMoving ? this._durationForMove(from, to) : 0);
+
+            // Swap walking frames only when actually moving (and not while serving)
+            if (isReallyMoving && dur > 80 && rec.status !== "serving") {
+                this._startWalking(rec);
                 if (rec.status === "waiting") rec.status = "walking";
+            }
+
+            // If not moving, ensure idle frame while waiting/serving
+            if (!isReallyMoving && (rec.status === "waiting" || rec.status === "serving")) {
+                this._stopWalking(rec);
             }
 
             rec.el.style.transitionTimingFunction = "linear";
@@ -216,6 +288,7 @@
             const rec = this.studentEls.get(id);
             if (!rec) return;
             this._clearStudentTimeouts(rec);
+            this._stopWalking(rec);
             rec.el.remove();
             this.studentEls.delete(id);
         }
@@ -224,17 +297,26 @@
             if (!this.studentsLayer) return;
             if (this.studentEls.has(id)) return;
 
-            const el = document.createElement("div");
-            // Appear at the entrance door, then walk to the waiting line.
-            el.className = "student walking";
-            el.title = `SV #${id}`;
+            const gender = this._studentGenderForId(id);
+            const { el, spriteEl } = this._createStudentEl(id, gender);
             this.studentsLayer.appendChild(el);
 
             const pDoor = this._centerInFloor(this.doorIn);
 
             this._setStudentTransform(el, pDoor.x, pDoor.y, 1);
 
-            const rec = { el, status: "walking", timeouts: [], pos: { x: pDoor.x, y: pDoor.y, scale: 1 } };
+            const rec = {
+                el,
+                spriteEl,
+                gender,
+                frameIdx: 1,
+                walkTimer: null,
+                walkPhase: 0,
+                status: "waiting",
+                timeouts: [],
+                pos: { x: pDoor.x, y: pDoor.y, scale: 1 },
+            };
+            this._setSpriteFrame(rec, 1);
             this.studentEls.set(id, rec);
         }
 
@@ -256,7 +338,7 @@
             const state = this._lastState;
             const nServers = state && state.servers ? state.servers.length : 2;
             const policy = state && state.config && state.config.policy ? state.config.policy : "single_queue_fifo";
-            
+
             const icons = [];
             for (let i = 1; i <= nServers; i++) {
                 const el = this._counterIconEl(i);
@@ -343,8 +425,7 @@
                 // If the student is still in a waiting/walking phase, stop the walking loop.
                 if (rec.status === "walking" || rec.status === "waiting") {
                     rec.status = "waiting";
-                    rec.el.classList.remove("walking");
-                    rec.el.classList.add("waiting");
+                    this._stopWalking(rec);
                 }
             }, delayMs + 100);
             rec.timeouts.push(t);
@@ -359,20 +440,29 @@
             if (!rec) return;
             this._clearStudentTimeouts(rec);
             rec.status = "toCounter";
-            rec.el.classList.remove("waiting");
-            rec.el.classList.add("walking");
+            this._startWalking(rec);
 
             const run = () => {
                 const icon = this._counterIconEl(serverId);
                 const target = this._centerInFloor(icon);
+                const fr = this._floorRect();
+                const floorCenterX = fr ? fr.width / 2 : target.x;
+
+                // Make them face-to-face: student stands slightly left/right of the librarian and faces toward them.
+                const counterOnLeft = target.x <= floorCenterX;
+                const offsetX = counterOnLeft ? this.COUNTER_FACE_OFFSET_PX : -this.COUNTER_FACE_OFFSET_PX;
+                // If student is placed to the right, they should face left, and vice versa.
+                this._setFacing(rec, counterOnLeft ? "left" : "right");
+
                 // approach
-                const approach = { x: target.x, y: target.y + 12 };
+                const approach = { x: target.x + offsetX, y: target.y + 12 };
                 const approachMs = this._moveStudent(studentId, approach.x, approach.y, 1);
                 // shrink into the desk (slower so it feels like walking into the counter)
                 const t1 = setTimeout(() => {
-                    rec.el.classList.remove("walking");
-                    this._moveStudent(studentId, target.x, target.y + 6, 0.35, 650);
+                    this._stopWalking(rec);
+                    // Mark as serving BEFORE final move so it stays idle inside the counter
                     rec.status = "serving";
+                    this._moveStudent(studentId, target.x + offsetX, target.y + 6, 0.35, 650);
                 }, approachMs + 60);
                 rec.timeouts.push(t1);
             };
@@ -386,7 +476,10 @@
             if (!rec) return;
             this._clearStudentTimeouts(rec);
             rec.status = "toExit";
-            rec.el.classList.add("walking");
+            this._startWalking(rec);
+
+            // Leaving the counter: clear facing so walking looks natural
+            this._setFacing(rec, null);
 
             if (!rec.exitCounted) {
                 rec.exitCounted = true;
@@ -471,9 +564,13 @@
             // Sinh viên vừa xử lý xong
             this.servedArea.innerHTML = "";
             for (const c of engineState.recentServed) {
-                const el = document.createElement("div");
-                el.className = "student served";
+                const gender = this._studentGenderForId(c.id);
+                const { el, spriteEl } = this._createStudentEl(c.id, gender);
+                el.classList.add("served");
                 el.title = `SV #${c.id} đã xử lý xong`;
+
+                // Ensure idle frame (no walking)
+                spriteEl.style.backgroundImage = `url("${this._spriteUrl(gender, 1)}")`;
                 this.servedArea.appendChild(el);
             }
 
@@ -508,6 +605,16 @@
                 if (assignedSet.has(server.id)) iconClass += " entering";
                 if (finishedSet.has(server.id)) iconClass += " leaving";
                 icon.className = iconClass;
+
+                const librarian = document.createElement("div");
+                librarian.className = "librarian";
+                {
+                    const n = engineState.servers.length;
+                    const mid = (n + 1) / 2;
+                    const dir = server.id <= mid ? "facing-right" : "facing-left";
+                    librarian.classList.add(dir);
+                }
+                icon.appendChild(librarian);
 
                 const status = document.createElement("div");
                 status.className = "counter-status";

@@ -10,6 +10,14 @@ body {
     color: #222;
 }
 
+:root {
+    --bk-red: #b00020;
+    --bk-red-dark: #7f0016;
+    --bk-red-soft: rgba(176, 0, 32, 0.10);
+    --bk-on-red: #ffffff;
+    --bk-card: #ffffff;
+}
+
 .app {
     max-width: 1100px;
     margin: 20px auto;
@@ -20,8 +28,35 @@ body {
 }
 
 .header {
-    text-align: center;
     margin-bottom: 18px;
+    background: linear-gradient(135deg, var(--bk-red) 0%, #cf0f2d 55%, var(--bk-red-dark) 100%);
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 12px 26px rgba(176, 0, 32, 0.22);
+    color: var(--bk-on-red);
+}
+
+.header-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.bk-logo {
+    width: 74px;
+    height: 74px;
+    object-fit: contain;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
+    display: block;
+    margin: 2px auto 10px;
+}
+
+.header-text {
+    text-align: center;
 }
 
 .header h1 {
@@ -30,7 +65,7 @@ body {
 }
 
 .header p {
-    color: #555;
+    color: rgba(255, 255, 255, 0.92);
 }
 
 .main {
@@ -276,14 +311,27 @@ body {
 .btn {
     padding: 8px 12px;
     border-radius: 8px;
-    border: 1px solid rgba(0, 0, 0, 0.18);
-    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    background: var(--bk-red);
+    color: var(--bk-on-red);
     cursor: pointer;
     font-weight: 600;
+    transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+    box-shadow: 0 10px 20px rgba(176, 0, 32, 0.16);
 }
 
 .btn:hover {
-    background: #f3f6ff;
+    background: var(--bk-red-dark);
+}
+
+.btn:active {
+    transform: translateY(1px);
+}
+
+.btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    box-shadow: none;
 }
 
 .control-group {
@@ -322,15 +370,15 @@ body {
     border-radius: 10px;
     border: 1px solid rgba(0, 0, 0, 0.10);
     cursor: pointer;
-    background: #0066cc;
-    color: #fff;
+    background: var(--bk-red);
+    color: var(--bk-on-red);
     font-weight: 600;
     transition: background 0.2s, transform 0.1s;
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.10);
+    box-shadow: 0 10px 20px rgba(176, 0, 32, 0.18);
 }
 
 .control-buttons button:hover {
-    background: #004999;
+    background: var(--bk-red-dark);
 }
 
 .control-buttons button:active {
@@ -412,6 +460,11 @@ button[data-tooltip]:focus-visible::before {
 }
 
 @media (max-width: 520px) {
+    .bk-logo {
+        width: 64px;
+        height: 64px;
+    }
+
     .control-buttons {
         gap: 8px;
     }
@@ -641,57 +694,31 @@ button[data-tooltip]:focus-visible::before {
     will-change: transform;
 }
 
-/* Render the student sprite on a child layer so animations don't conflict with JS translate/scale */
-.student::before {
-    content: "";
+/* Student sprite (JS swaps background-image frames when walking) */
+.student-sprite {
     position: absolute;
     inset: 0;
-    background-image: url("/images/student.png");
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
     filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.30));
     transform-origin: center bottom;
-    will-change: transform, filter;
+    will-change: background-image;
 }
 
-/* Walking animation: alternate left/right step feel ("đổi chân") */
-@keyframes walk-step {
-    0% {
-        transform: translateY(0) rotate(-2deg) skewX(-2deg) scaleX(0.99);
-        filter: drop-shadow(-1px 5px 6px rgba(0, 0, 0, 0.25));
-    }
-    25% {
-        transform: translateY(-4px) rotate(-6deg) skewX(-4deg) scaleX(1.02);
-        filter: drop-shadow(-2px 3px 5px rgba(0, 0, 0, 0.35));
-    }
-    50% {
-        transform: translateY(0) rotate(2deg) skewX(2deg) scaleX(0.99);
-        filter: drop-shadow(1px 5px 6px rgba(0, 0, 0, 0.25));
-    }
-    75% {
-        transform: translateY(-4px) rotate(6deg) skewX(4deg) scaleX(1.02);
-        filter: drop-shadow(2px 3px 5px rgba(0, 0, 0, 0.35));
-    }
-    100% {
-        transform: translateY(0) rotate(-2deg) skewX(-2deg) scaleX(0.99);
-        filter: drop-shadow(-1px 5px 6px rgba(0, 0, 0, 0.25));
-    }
+.student.facing-left .student-sprite {
+    transform: scaleX(-1);
 }
 
-.student.walking::before {
-    animation: walk-step 420ms ease-in-out infinite;
-}
-
-.student.waiting::before {
-    animation: queue-breathe 1.4s ease-in-out infinite alternate;
+.student.facing-right .student-sprite {
+    transform: scaleX(1);
 }
 
 .student.served {
     opacity: 0.7;
 }
 
-.student.served::before {
+.student.served .student-sprite {
     filter: grayscale(0.9) drop-shadow(0 4px 5px rgba(0, 0, 0, 0.2));
     opacity: 0.7;
     animation: served-exit 4s ease-out forwards;
@@ -730,6 +757,30 @@ button[data-tooltip]:focus-visible::before {
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
+    position: relative;
+}
+
+.librarian {
+    position: absolute;
+    left: 50%;
+    top: 56%;
+    transform: translate(-50%, -50%);
+    width: 30px;
+    height: 30px;
+    background-image: url("/images/librarian.png");
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
+}
+
+.librarian.facing-left {
+    transform: translate(-50%, -50%) scaleX(-1);
+}
+
+.librarian.facing-right {
+    transform: translate(-50%, -50%) scaleX(1);
 }
 
 .counter-icon.free {
@@ -910,13 +961,6 @@ canvas {
     }
 }
 
-.footer {
-    margin-top: 18px;
-    text-align: center;
-    font-size: 13px;
-    color: #777;
-}
-
 @media (max-width: 768px) {
     .app {
         margin: 10px;
@@ -929,4 +973,20 @@ canvas {
     .speed-label {
         margin-left: 0;
     }
+}
+
+.footer {
+    margin-top: 18px;
+    background: linear-gradient(135deg, rgba(176, 0, 32, 0.95) 0%, rgba(127, 0, 22, 0.98) 100%);
+    border-radius: 16px;
+    padding: 12px 14px;
+    text-align: center;
+    color: var(--bk-on-red);
+    box-shadow: 0 12px 26px rgba(176, 0, 32, 0.16);
+}
+
+.footer p {
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: 0.2px;
 }
