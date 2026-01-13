@@ -586,6 +586,8 @@ button[data-tooltip]:focus-visible::before {
 
 .door-in {
     left: 16px;
+    top: 16px;
+    bottom: auto;
 }
 
 .door-in::before {

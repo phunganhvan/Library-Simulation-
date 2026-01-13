@@ -135,14 +135,107 @@
             return this.floor.getBoundingClientRect();
         }
 
-        _centerInFloor(el) {
-            const fr = this._floorRect();
-            if (!fr || !el) return { x: 0, y: 0 };
-            const r = el.getBoundingClientRect();
+        _floorSizeForLayout() {
+            if (!this.floor) return { w: 0, h: 0 };
+            let w = this.floor.clientWidth || 0;
+            let h = this.floor.clientHeight || 0;
+            if (w > 0 && h > 0) return { w, h };
+            const cs = getComputedStyle(this.floor);
+            const cw = parseFloat(cs.width);
+            const ch = parseFloat(cs.height);
+            if (!(w > 0) && Number.isFinite(cw)) w = cw;
+            if (!(h > 0) && Number.isFinite(ch)) h = ch;
+            return { w: w || 0, h: h || 0 };
+        }
+
+        _centerInFloorByStyle(el) {
+            if (!this.floor || !el) return null;
+            const { w: floorW, h: floorH } = this._floorSizeForLayout();
+            if (!(floorW > 0) || !(floorH > 0)) return null;
+
+            const cs = getComputedStyle(el);
+            const w = parseFloat(cs.width) || 0;
+            const h = parseFloat(cs.height) || 0;
+
+            const left = parseFloat(cs.left);
+            const right = parseFloat(cs.right);
+            const top = parseFloat(cs.top);
+            const bottom = parseFloat(cs.bottom);
+
+            let x = null;
+            let y = null;
+
+            if (Number.isFinite(left)) x = left + w / 2;
+            else if (Number.isFinite(right)) x = floorW - right - w / 2;
+
+            if (Number.isFinite(top)) y = top + h / 2;
+            else if (Number.isFinite(bottom)) y = floorH - bottom - h / 2;
+
+            if (!(typeof x === "number") || !(typeof y === "number")) return null;
+
             return {
-                x: (r.left - fr.left) + r.width / 2,
-                y: (r.top - fr.top) + r.height / 2,
+                x: x + (this.floor.scrollLeft || 0),
+                y: y + (this.floor.scrollTop || 0),
             };
+        }
+
+        _centerInFloor(el) {
+            if (!el || !this.floor) return { x: 0, y: 0 };
+
+            const fr = this._floorRect();
+            const r = el.getBoundingClientRect();
+
+            // If the simulation view is hidden (display:none), DOMRects are often all zeros.
+            // In that case, fall back to style-based positioning (left/bottom etc.).
+            const rectLooksInvalid = !(r.width > 0 || r.height > 0) || (!(r.left || r.top || r.right || r.bottom) && !(r.width || r.height));
+            const floorLooksInvalid = !fr || (!(fr.width > 0) && !(fr.height > 0));
+            if (rectLooksInvalid || floorLooksInvalid) {
+                const byStyle = this._centerInFloorByStyle(el);
+                if (byStyle) return byStyle;
+            }
+
+            if (!fr) return { x: 0, y: 0 };
+
+            return {
+                // Convert from viewport coords to floor *content* coords
+                // so positions remain correct when the floor is scrolled.
+                x: (r.left - fr.left) + r.width / 2 + (this.floor.scrollLeft || 0),
+                y: (r.top - fr.top) + r.height / 2 + (this.floor.scrollTop || 0),
+            };
+        }
+
+        _doorInEl() {
+            if (this.doorIn && document.contains(this.doorIn)) return this.doorIn;
+            this.doorIn = document.getElementById("door-in");
+            return this.doorIn;
+        }
+
+        _doorOutEl() {
+            if (this.doorOut && document.contains(this.doorOut)) return this.doorOut;
+            this.doorOut = document.getElementById("door-out");
+            return this.doorOut;
+        }
+
+        _fallbackDoorInPoint() {
+            // If door element isn't measurable for any reason, avoid spawning at (0,0).
+            // This matches the CSS door size (78x78) + padding (16px) for top-left placement.
+            const scrollLeft = this.floor ? (this.floor.scrollLeft || 0) : 0;
+            const scrollTop = this.floor ? (this.floor.scrollTop || 0) : 0;
+            const doorSize = 78;
+            const pad = 16;
+            return { x: pad + doorSize / 2 + scrollLeft, y: pad + doorSize / 2 + scrollTop };
+        }
+
+        _fallbackDoorOutPoint() {
+            // Default door-out is bottom-right (16px padding).
+            const { w: floorW, h: floorH } = this._floorSizeForLayout();
+            const scrollLeft = this.floor ? (this.floor.scrollLeft || 0) : 0;
+            const scrollTop = this.floor ? (this.floor.scrollTop || 0) : 0;
+            const doorSize = 78;
+            const pad = 16;
+            const x = Math.max(doorSize / 2, floorW - pad - doorSize / 2) + scrollLeft;
+            const y = Math.max(doorSize / 2, floorH - pad - doorSize / 2) + scrollTop;
+            return { x, y };
         }
 
         _setStudentTransform(el, x, y, scale) {
@@ -301,7 +394,8 @@
             const { el, spriteEl } = this._createStudentEl(id, gender);
             this.studentsLayer.appendChild(el);
 
-            const pDoor = this._centerInFloor(this.doorIn);
+            const doorEl = this._doorInEl();
+            const pDoor = doorEl ? this._centerInFloor(doorEl) : this._fallbackDoorInPoint();
 
             this._setStudentTransform(el, pDoor.x, pDoor.y, 1);
 
@@ -488,9 +582,11 @@
             }
 
             const icon = this._counterIconEl(serverId);
-            const pDesk = icon ? this._centerInFloor(icon) : this._centerInFloor(this.doorIn);
+            const doorInEl = this._doorInEl();
+            const pDesk = icon ? this._centerInFloor(icon) : (doorInEl ? this._centerInFloor(doorInEl) : this._fallbackDoorInPoint());
             const pBehind = { x: pDesk.x, y: Math.max(20, pDesk.y - 70) };
-            const pOut = this._centerInFloor(this.doorOut);
+            const doorOutEl = this._doorOutEl();
+            const pOut = doorOutEl ? this._centerInFloor(doorOutEl) : this._fallbackDoorOutPoint();
 
             // Step 1: move behind the counter ("walk around")
             const behindMs = this._moveStudent(studentId, pBehind.x, pBehind.y, 0.5);
@@ -525,6 +621,13 @@
 
             this._lastState = engineState;
             this._resetExitCountIfNeeded(engineState);
+
+            // If the simulation view is currently hidden (e.g., view-sim is display:none),
+            // geometry APIs return (0,0) and students end up spawning from the top-left.
+            // Skip visual work until the floor is actually visible.
+            const fr = this._floorRect();
+            const floorVisible = fr && fr.width > 4 && fr.height > 4;
+            if (!floorVisible) return;
 
             // Sync visual waiting list from engine state (FIFO / multi-queue)
             this._syncWaitingFromState(engineState);
